@@ -27,7 +27,7 @@ In this project, you need to write 3 methods for ARIES 3 phases. you can search 
 
 You do not need to change any other java files except the 3 method to pass all test cases.
 
-I prepare 7 test cases for you from simple situation to complex situation. 
+I prepare 7 test cases for you from simple situation to complex situation in `TinyDBClientTest.java`
 
 all the test cases is random to make the tiny db crash.
 

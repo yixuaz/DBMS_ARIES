@@ -56,4 +56,8 @@ public enum Expression {
         }
         throw new IllegalArgumentException("invalid condition");
     }
+
+    public static boolean isEqual(Expression p) {
+        return p == EQUAL;
+    }
 }

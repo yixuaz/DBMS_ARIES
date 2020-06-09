@@ -6,26 +6,25 @@ import serverlayer.model.InvalidSqlException;
 import serverlayer.model.LogicalPlan;
 import serverlayer.model.PhysicalPlan;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-
 public class DBServer {
     // IMMUTABLE CLASS
     private static final SQLParser sqlParser = new SQLParser();
     private static final Optimizer optimizer = new Optimizer();
 
-
-
-    public static PhysicalPlan doit(String sql, IIsolationLevel isolationLevel) throws InvalidSqlException {
-        if ("commit".equals(sql)) return null;
+    public static PhysicalPlan generatePhysicalPlan(String sql, IIsolationLevel isolationLevel) throws InvalidSqlException {
         long clientId = Thread.currentThread().getId();
         Integer txnId = SystemCatalog.getTxnId(clientId);
-
-        LogicalPlan logicalPlan = sqlParser.parse(sql);
+        LogicalPlan logicalPlan = sqlParser.parse(sql, txnId);
         logicalPlan.setTxnId(txnId);
         logicalPlan.setIsolationLevel(isolationLevel);
+        if (noNeedOptimizer(sql)) {
+            return new PhysicalPlan(null, logicalPlan);
+        }
         logicalPlan.setReadView(isolationLevel.getTxnReadView());
         return optimizer.convertToPhysicalPlan(logicalPlan);
+    }
+
+    private static boolean noNeedOptimizer(String sql) {
+        return sql.equals("commit") || sql.startsWith("insert");
     }
 }

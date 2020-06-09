@@ -21,8 +21,8 @@ public class ReadUncomitted implements IIsolationLevel {
 
     @Override
     public ITuple lockIfVisible(ITuple ret, LockMode lockMode, TxnReadView readView, LockStrategy strategy) {
-        if (ret.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-            addLock(lockMode, ret, LockType.RECORD_LOCK);
+        if (lockMode != LockMode.INSERT_INTENTION && ret.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
+            addLock(lockMode, ret);
         }
         return ret;
     }
@@ -31,9 +31,11 @@ public class ReadUncomitted implements IIsolationLevel {
     @Override
     public void unlockIfPossible(ITuple ret, ITuple backup, LockMode lockMode, boolean isTreeSearchLastNotMatchCondition) {
         if (ret.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-            removeLock(lockMode, ret, LockType.RECORD_LOCK);
+            removeLock(lockMode, ret);
         }
-        removeLock(lockMode, backup, LockType.RECORD_LOCK);
+        if (backup != null && backup.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
+            removeLock(lockMode, backup);
+        }
     }
 
     @Override

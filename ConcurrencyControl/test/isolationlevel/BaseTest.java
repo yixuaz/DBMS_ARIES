@@ -1,7 +1,9 @@
+package isolationlevel;
+
 import dbengine.transaction.IsolationLevel;
 import dbms.SystemCatalog;
 import dbms.TransactionThread;
-import model.SqlMsg;
+import isolationlevel.model.SqlMsg;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -46,9 +48,11 @@ public abstract class BaseTest {
                     new TransactionThread(getIsolationLevel(), txns.get(i))));
             new Thread(futureTasks.get(futureTasks.size() - 1)).start();
         }
+        boolean isFirstMsg = true;
         for (SqlMsg sql : msgs) {
             txns.get(sql.getTxnId()).add(sql.getSql());
-            Thread.sleep(110);
+            Thread.sleep(isFirstMsg ? 200 : 50);
+            isFirstMsg = false;
         }
         for (FutureTask ft : futureTasks) ft.get();
 

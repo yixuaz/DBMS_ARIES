@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SystemCatalog {
     public static final int END_DUMMY_TXN_ID_TAG = Integer.MIN_VALUE;
     public static final ITuple INVALID_TUPLE = new PrimaryTuple(-1,null,-1,null,null,-1);
+    public static final int NULL_PRIMARY_ID = Integer.MIN_VALUE;
     private static Map<String, ITable> name2table = new HashMap<>();
     private static Map<ITable, TableSystemCatalog> name2tableConfig = new HashMap<>();
     private static final AtomicInteger txnIdGenerator = new AtomicInteger(0);

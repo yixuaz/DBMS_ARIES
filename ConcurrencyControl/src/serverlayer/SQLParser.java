@@ -1,5 +1,6 @@
 package serverlayer;
 
+import dbengine.storage.ITuple;
 import dbms.SystemCatalog;
 import dbms.TableSystemCatalog;
 import dbengine.storage.Expression;
@@ -18,9 +19,10 @@ public class SQLParser {
     static final String TABLE_TAG = "from ";
     static final String WHERE_TAG = "where ";
     static final String SET_TAG = "set ";
-    static final String SHARE_MODE_TAG = "in share mode";
+    static final String VALUES_TAG = "values(";
+    static final String SHARE_MODE_TAG = "lock in share mode";
     static final String EXLCUSIVE_MODE_TAG = "for update";
-    public LogicalPlan parse(String sql) throws InvalidSqlException {
+    public LogicalPlan parse(String sql, int txnId) throws InvalidSqlException {
         sql = sql.trim().replaceAll(" +"," ");
         LogicalPlan rawPlan = new LogicalPlan();
         if (sql.startsWith("select")) {
@@ -44,8 +46,37 @@ public class SQLParser {
             rawPlan.setSelectedColumns(selectAll(rawPlan.getTable()));
             rawPlan.setPredicates(getPredicate(rawPlan.getTable(), sql));
             rawPlan.setUpdatedValues(getUpdateFunction(rawPlan.getTable(), sql));
+        } else if (sql.startsWith("insert")) {
+            rawPlan.setLockMode(LockMode.INSERT_INTENTION);
+            rawPlan.setTable(getTable(sql, "insert "));
+            rawPlan.setInsertTuple(getInsertTuple(sql, rawPlan.getTable(), txnId));
         }
         return rawPlan;
+    }
+
+    private ITuple getInsertTuple(String sql, ITable table, int txnId) throws InvalidSqlException {
+        int idx = sql.indexOf(VALUES_TAG);
+        if (idx == -1) {
+            throw new InvalidSqlException("invalid insert sql syntax");
+        }
+        idx += VALUES_TAG.length();
+        int end = sql.indexOf(")", idx);
+        String[] offsetValues = sql.substring(idx, end).split(",");
+        String rawPid = offsetValues[0].trim();
+        int pid = rawPid.equals("null") ? SystemCatalog.NULL_PRIMARY_ID : Integer.parseInt(rawPid);
+        TableSystemCatalog tableConfig = SystemCatalog.getTableConfig(table);
+        List<Comparable> otherFields = new ArrayList<>();
+        for (int i = 1; i < table.columns(); i++) {
+            otherFields.add(tableConfig.toRealType(i, removeQuote(offsetValues[i].trim())));
+        }
+        ITuple ret = table.getClusterIndex().buildInsertTuple(pid,txnId, otherFields.toArray(new Comparable[0]));
+        return ret;
+    }
+
+    private String removeQuote(String trim) {
+        if (trim.length() >= 2 && (trim.charAt(0) == '\'' || trim.charAt(0) == '\"'))
+            return trim.substring(1, trim.length() - 1);
+        return trim;
     }
 
     private List<UpdatedFunction> getUpdateFunction(ITable table, String sql) throws InvalidSqlException {

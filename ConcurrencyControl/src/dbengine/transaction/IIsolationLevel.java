@@ -26,37 +26,23 @@ public interface IIsolationLevel {
 
     default void commit() {
         for (HoldLock lock : getHoldLocks()) {
-            if (lock.type == LockType.RECORD_LOCK) {
-                if (lock.mode == LockMode.SHARE) {
-                    lock.lock.unlockInReadMode();
-                } else {
-                    lock.lock.unlockInWriteMode();
-                }
-            } else {
-                lock.lock.unlockGapLock();
-            }
+            lock.mode.unlock(lock.lock);
         }
         getHoldLocks().clear();
     }
 
-    default void addLock(LockMode mode, IDBLock lock, LockType type) {
+    default void addLock(LockMode mode, IDBLock lock) {
         if (mode != null) {
-            if (type == LockType.RECORD_LOCK) {
-                mode.lock(lock);
-            } else {
-                lock.lockGapLock();
-            }
-            getHoldLocks().add(new HoldLock(lock, mode, type));
+            mode.lock(lock);
+            getHoldLocks().add(new HoldLock(lock, mode));
         }
     }
-    default void removeLock(LockMode mode, IDBLock lock, LockType type) {
+    default void removeLock(LockMode mode, IDBLock lock) {
         if (mode != null && lock != null) {
-            if (type == LockType.RECORD_LOCK) {
-                mode.unlock(lock);
-            } else {
-                lock.unlockGapLock();
+            mode.unlock(lock);
+            if (!getHoldLocks().remove(new HoldLock(lock, mode))) {
+                throw new IllegalStateException();
             }
-            assert getHoldLocks().remove(new HoldLock(lock, mode, type));
         }
     }
 

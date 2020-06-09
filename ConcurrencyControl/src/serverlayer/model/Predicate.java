@@ -4,9 +4,9 @@ import dbengine.storage.Expression;
 import dbengine.storage.ITuple;
 
 public class Predicate {
-    int offset;
-    Expression expression;
-    Comparable value;
+    public final int offset;
+    public final Expression expression;
+    public final Comparable value;
 
     public Predicate(int offset, Expression expression, Comparable value) {
         this.offset = offset;

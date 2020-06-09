@@ -1,12 +1,9 @@
 package dbengine.transaction;
 
-import dbengine.storage.ITuple;
-
 public class LockStrategy {
-    boolean isTreeSearch, meetCondition;
+    boolean couldOptimizeToRecordLockOnly;
 
-    public LockStrategy(boolean isTreeSearch, boolean meetCondition) {
-        this.isTreeSearch = isTreeSearch;
-        this.meetCondition = meetCondition;
+    public LockStrategy(boolean couldOptimizeToRecordLockOnly) {
+        this.couldOptimizeToRecordLockOnly = couldOptimizeToRecordLockOnly;
     }
 }

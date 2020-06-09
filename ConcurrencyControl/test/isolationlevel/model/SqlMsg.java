@@ -1,4 +1,4 @@
-package model;
+package isolationlevel.model;
 
 public class SqlMsg {
     int txnId;

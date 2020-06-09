@@ -5,25 +5,46 @@ import dbengine.storage.IDBLock;
 public enum LockMode {
     SHARE {
         @Override
-        void lock(IDBLock lock) {
-            lock.lockInReadMode();
+        public void lock(IDBLock lock) {
+            lock.getRWLock().readLock().lock();
         }
 
         @Override
-        void unlock(IDBLock lock) {
-            lock.unlockInReadMode();
+        public void unlock(IDBLock lock) {
+            lock.getRWLock().readLock().unlock();
         }
     }, EXCLUSIVE {
         @Override
-        void lock(IDBLock lock) {
-            lock.lockInWriteMode();
+        public void lock(IDBLock lock) {
+            lock.getRWLock().writeLock().lock();
         }
 
         @Override
-        void unlock(IDBLock lock) {
-            lock.unlockInWriteMode();
+        public void unlock(IDBLock lock) {
+            lock.getRWLock().writeLock().unlock();
+        }
+    }, INSERT_INTENTION {
+        @Override
+        public void lock(IDBLock lock) {
+            lock.getGapLock().insertIntention();
+        }
+
+        @Override
+        public void unlock(IDBLock lock) {
+            lock.getGapLock().refresh();
+        }
+    }, GAP_LOCK {
+        @Override
+        public void lock(IDBLock lock) {
+            lock.getGapLock().lock();
+        }
+
+        @Override
+        public void unlock(IDBLock lock) {
+            lock.getGapLock().unlock();
         }
     };
-    abstract void lock(IDBLock lock);
-    abstract void unlock(IDBLock lock);
+
+    public abstract void lock(IDBLock lock);
+    public abstract void unlock(IDBLock lock);
 }

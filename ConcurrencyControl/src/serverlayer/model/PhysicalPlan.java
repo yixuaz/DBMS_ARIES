@@ -21,70 +21,79 @@ public class PhysicalPlan implements Iterator<ITuple> {
     public final int currentPlan;
     Predicate targetPredicate;
     LogicalPlan logicalPlan;
-    boolean targetIsTreeSearch = false;
+
+    boolean targetIsTreeSearchWithEqualExp = false;
     boolean lastIsInvalid = false;
+    ITuple curTuple;
+    ITuple nextTuple;
     private ITuple endDummy;
 
     public PhysicalPlan(Predicate selectedPredicate, LogicalPlan logicalPlan) {
         targetPredicate = selectedPredicate;
         this.logicalPlan = logicalPlan;
+        if (isSqlWithoutCRUD()) { // commit or begin
+            currentPlan = -1;
+            return;
+        }
         if (selectedPredicate == null) {
             currentPlan = allTableScan;
-            nextTuple = logicalPlan.table.getClusterIndex().firstTuple();
+           // nextTuple = logicalPlan.table.getClusterIndex().firstTuple();
+            curTuple = new DummyTuple(logicalPlan.table.getClusterIndex().firstTuple());
             endDummy = logicalPlan.table.getClusterIndex().endDummy();
         } else if (selectedPredicate.offset == 1) {
             currentPlan = secondaryIndexScan;
             NonUniqueIndex nameIndex = logicalPlan.table.getSecondaryIndex(selectedPredicate.offset);
             endDummy = nameIndex.endDummy();
-            if (selectedPredicate.expression == Expression.LESS || selectedPredicate.expression == Expression.LESS_EQUAL) {
-                nextTuple = nameIndex.firstTuple();
-            } else if (selectedPredicate.expression == Expression.LARGER) {
-                ITuple searchTuple = nameIndex.buildSearchTuple((String) selectedPredicate.value, Integer.MAX_VALUE);
-                nextTuple = nameIndex.findTuple(searchTuple);
-                if (nextTuple != endDummy && nextTuple.compareTo(searchTuple) == 0) {
-                    nextTuple = nextTuple.next();
-                } else {
-                    targetIsTreeSearch = nextTuple != endDummy;
-                }
-            } else {
-                nextTuple = nameIndex.findTuple(nameIndex.buildSearchTuple((String) selectedPredicate.value, Integer.MIN_VALUE));
-                targetIsTreeSearch = nextTuple != endDummy;
-            }
+            fulfill(nameIndex.firstSearch(selectedPredicate));
         } else {
             currentPlan = primaryIndexScan;
             PrimaryIndex primaryIndex = logicalPlan.table.getClusterIndex();
             endDummy = primaryIndex.endDummy();
-            if (selectedPredicate.expression == Expression.LESS || selectedPredicate.expression == Expression.LESS_EQUAL) {
-                nextTuple = primaryIndex.firstTuple();
-            } else  {
-                ITuple searchTuple = primaryIndex.buildSearchTuple((Integer) selectedPredicate.value);
-                nextTuple = primaryIndex.findTuple(searchTuple);
-                if (selectedPredicate.expression == Expression.LARGER && nextTuple.compareTo(searchTuple) == 0) {
-                    nextTuple = nextTuple.next();
-                } else {
-                    targetIsTreeSearch = nextTuple != endDummy;
-                }
-            }
+            fulfill(primaryIndex.firstSearch(selectedPredicate));
         }
     }
 
-    ITuple nextTuple;
+    private boolean isSqlWithoutCRUD() {
+        return logicalPlan.table == null;
+    }
+
+    private void fulfill(IndexSearchResult result) {
+        curTuple = new DummyTuple(result.nextTuple);
+        // nextTuple = result.nextTuple;
+        this.targetIsTreeSearchWithEqualExp = result.targetIsTreeSearchWithEqualExp;
+        this.lastIsInvalid = result.lastTupleIsInvalid;
+    }
+
 
     @Override
     public boolean hasNext() {
-        return nextTuple != null;
+        // return nextTuple != null;
+        return curTuple.next() != null;
     }
 
     @Override
     public ITuple next() {
-        ITuple ret = nextTuple;
-
-        nextTuple =  nextTuple.next();
-        if (lastIsInvalid && targetPredicate != null && nextTuple != null && nextTuple != endDummy &&
-                (lastIsInvalid = !(targetPredicate.check(nextTuple.getOffsetValue(targetPredicate.offset))))) {
-            nextTuple = null;
+//        ITuple ret = nextTuple;
+//        boolean preLastIsInvalid = lastIsInvalid;
+//        nextTuple =  nextTuple.next();
+//
+//        if (targetPredicate != null) {
+//            lastIsInvalid = (nextTuple == endDummy) || (nextTuple == null) ||
+//                    !(targetPredicate.check(nextTuple.getOffsetValue(targetPredicate.offset)));
+//        }
+//        // 索引上的范围查询会访问到不满足条件的第一个值为止
+//        if (preLastIsInvalid) {
+//            nextTuple = null;
+//        }
+//
+//        return ret;
+        curTuple = curTuple.next();
+        ITuple ret = curTuple;
+        if (lastIsInvalid || curTuple == endDummy ||
+                (targetPredicate != null
+                        && !(targetPredicate.check(curTuple.getOffsetValue(targetPredicate.offset))))) {
+            curTuple = new DummyTuple(null);
         }
-
         return ret;
     }
 
@@ -115,12 +124,16 @@ public class PhysicalPlan implements Iterator<ITuple> {
 
     public List<UpdatedFunction> getUpdateFunction() { return logicalPlan.updatedValues; }
 
+    public ITuple getInsertTuple() { return logicalPlan.insertTuple; }
+
+    public ITable getTable() {return logicalPlan.table;}
+
     public TxnReadView getReadView() {
         return logicalPlan.readView;
     }
 
-    public boolean isTargetIsTreeSearch() {
-        return targetIsTreeSearch;
+    public boolean isTargetIsTreeSearchWithEqualExp() {
+        return targetIsTreeSearchWithEqualExp;
     }
 
     public boolean isEndDummy(ITuple ret) {
@@ -132,7 +145,11 @@ public class PhysicalPlan implements Iterator<ITuple> {
     }
 
     public boolean meetCondition(ITuple find) {
-        if (targetPredicate == null || find == endDummy) return false;
+        if (targetPredicate == null) return true;
         return targetPredicate.check(find);
+    }
+
+    public boolean isEqualExpPlan() {
+        return targetPredicate != null && Expression.isEqual(targetPredicate.expression);
     }
 }

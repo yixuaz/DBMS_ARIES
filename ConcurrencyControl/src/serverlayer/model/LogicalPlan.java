@@ -1,5 +1,6 @@
 package serverlayer.model;
 
+import dbengine.storage.ITuple;
 import dbengine.storage.tables.ITable;
 import dbengine.transaction.IIsolationLevel;
 import dbengine.transaction.LockMode;
@@ -8,6 +9,7 @@ import dbengine.transaction.TxnReadView;
 import java.util.List;
 
 public class LogicalPlan {
+    ITuple insertTuple;
     ITable table;
     List<Predicate> predicates;
     List<Integer> selectedColumns;
@@ -75,5 +77,9 @@ public class LogicalPlan {
 
     public void setReadView(TxnReadView readView) {
         this.readView = readView;
+    }
+
+    public void setInsertTuple(ITuple insertTuple) {
+        this.insertTuple = insertTuple;
     }
 }

@@ -5,6 +5,10 @@ import dbengine.storage.multipleversion.IDeltaStorageRecordIterator;
 import dbengine.storage.multipleversion.IDeltaStorageRecordUpdater;
 import dbengine.storage.ITuple;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 import static dbms.SystemCatalog.END_DUMMY_TXN_ID_TAG;
 
 public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
@@ -14,7 +18,8 @@ public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
     IDeltaStorageRecordIterator prevVersionRecord;
     int txnId;
     PrimaryTuple next, prev;
-
+    final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    final GapLock gapLock;
     public PrimaryTuple(int id, String name, int num, PrimaryTuple next, PrimaryTuple prev, int txnId) {
         this.id = id;
         this.name = name;
@@ -22,6 +27,7 @@ public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
         this.next = next;
         this.prev = prev;
         this.txnId = txnId;
+        gapLock = new GapLock(prev, this);
     }
     private PrimaryTuple(int id, String name, int num, PrimaryTuple next, PrimaryTuple prev) {
         this(id, name, num, next, prev, -1);
@@ -62,11 +68,14 @@ public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
     }
 
     @Override
+    public ReadWriteLock getRWLock() {
+        return rwLock;
+    }
+
+
+    @Override
     public GapLock getGapLock() {
-        if (gapLockCnt.get() > 0) {
-            return new GapLock(prev, this.txnId == END_DUMMY_TXN_ID_TAG ? null : this);
-        }
-        return null;
+        return gapLock;
     }
 
     @Override
@@ -79,10 +88,6 @@ public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
         return next;
     }
 
-    @Override
-    public GapLock getPairGapLock() {
-        return null;
-    }
 
     @Override
     public int getTxnId() {

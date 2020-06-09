@@ -1,5 +1,8 @@
 package dbengine;
 
+import dbengine.storage.IIndex;
+import dbengine.storage.IUniqueIndex;
+import dbengine.storage.tables.ITable;
 import dbengine.transaction.LockMode;
 import dbengine.transaction.LockStrategy;
 import dbms.DBEngineGlobalEnvironment;
@@ -25,7 +28,7 @@ public class DBEngine implements IDBEngine{
         if (physicalPlan != null) {
             this.physicalPlan = physicalPlan;
             isFirstTuple = true;
-            isFirstNotMeetCondition = physicalPlan.currentPlan != PhysicalPlan.allTableScan;
+            isFirstNotMeetCondition = (physicalPlan.currentPlan != PhysicalPlan.allTableScan);
         }
     }
 
@@ -50,43 +53,43 @@ public class DBEngine implements IDBEngine{
         }
 
         // enhance 负责 判断可见性， 如可见根据隔离级别来加锁
-        LockStrategy strategy = new LockStrategy(isFirstTuple && physicalPlan.isTargetIsTreeSearch(),
-                physicalPlan.meetCondition(ret));
+        LockStrategy strategy = new LockStrategy(isFirstTuple && physicalPlan.isTargetIsTreeSearchWithEqualExp());
         ret = isolationLevel.lockIfVisible(ret, physicalPlan.getLockMode(),
                 physicalPlan.getReadView(),strategy);
-        if (ret == SystemCatalog.INVALID_TUPLE) return null;
         isFirstTuple = false;
         if (ret == null) { // 不可见
             return next();
         }
         // 可见，判断是否要回表
+        boolean meetAllProjection = false;
+        if (physicalPlan.isEndDummy(ret)) return null;
+
         if (!needBackToPrimary) { // go back to primary index
-            if (physicalPlan.isEndDummy(ret)) return null;
-            backup = ret;
-            ret = physicalPlan.findInPrimaryIndex(backup);
-            strategy = new LockStrategy(true, true);
-            LockMode mode = physicalPlan.getLockMode();
-            if (mode != null) mode = LockMode.SHARE;
-            ret = isolationLevel.lockIfVisible(ret, mode, physicalPlan.getReadView(), strategy);
+            if (physicalPlan.meetCondition(ret)) {
+                backup = ret;
+                ret = physicalPlan.findInPrimaryIndex(backup);
+                strategy = new LockStrategy(true);
+                ret = isolationLevel.lockIfVisible(ret, physicalPlan.getLockMode(), physicalPlan.getReadView(), strategy);
+            }
         }
         // 负责判断谓词是否满足，不满足是否可以立刻释放锁
-        boolean meetAllProjection = !physicalPlan.isEndDummy(ret);
+        meetAllProjection = true;
         List<Predicate> predicates = physicalPlan.getProjection();
         for (Predicate predicate : predicates) {
             meetAllProjection &= predicate.check(ret);
         }
+
         if (!meetAllProjection) {
             isolationLevel.unlockIfPossible(ret, backup, physicalPlan.getLockMode(), isFirstNotMeetCondition);
             isFirstNotMeetCondition = false;
             return next();
         }
-
         return (IPrimaryTuple) ret;
     }
 
-    public void commit(IIsolationLevel isolationLevel, int txnId) {
-        isolationLevel.commit();
-        DBEngineGlobalEnvironment.removeTxnId(txnId);
+    public void commit() {
+        physicalPlan.getIsolationLevel().commit();
+        DBEngineGlobalEnvironment.removeTxnId(physicalPlan.getTxnId());
     }
 
     public int updateNextRow() {
@@ -107,6 +110,43 @@ public class DBEngine implements IDBEngine{
                     toBeAppends.toArray(new UpdatedFunction[0])));
         }
         return updateSuccess ? 1 : 0;
+    }
+
+    // assumption, no need auto generated primary key in insert
+    public ITuple insert() {
+        ITable table = physicalPlan.getTable();
+        ITuple toBeAdd = physicalPlan.getInsertTuple();
+        ITuple gap = table.getClusterIndex().findTuple(toBeAdd);
+        synchronized (gap) {
+            // check duplicate
+            boolean isDuplicateKey = table.getClusterIndex().containsKey(toBeAdd);
+            for (IIndex index : table.secondaryIndexes()) {
+                if (index instanceof IUniqueIndex) {
+                    isDuplicateKey |= ((IUniqueIndex)index).containsKey(toBeAdd);
+                }
+            }
+            if (isDuplicateKey) return null;
+
+            // add gap lock
+            LockMode mode =  physicalPlan.getLockMode();
+            assert mode == LockMode.INSERT_INTENTION;
+            IIsolationLevel isolationLevel = physicalPlan.getIsolationLevel();
+            isolationLevel.addLock(mode, gap);
+            for (IIndex index : table.secondaryIndexes()) {
+                physicalPlan.getIsolationLevel().lockIfVisible(index.findTuple(toBeAdd), mode, null,null);
+            }
+            ITuple ret;
+            if ((ret = table.getClusterIndex().insert(toBeAdd)) == null) {
+                throw new IllegalStateException("invalid area primary index");
+            }
+            isolationLevel.addLock(LockMode.EXCLUSIVE, ret);
+            for (IIndex index : table.secondaryIndexes()) {
+                if (index.insert(toBeAdd) == null) {
+                    throw new IllegalStateException("invalid area secondary index");
+                }
+            }
+            return toBeAdd;
+        }
     }
 
     // public boolean insert()

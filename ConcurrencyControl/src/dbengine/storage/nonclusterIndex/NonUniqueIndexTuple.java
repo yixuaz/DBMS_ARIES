@@ -1,7 +1,10 @@
 package dbengine.storage.nonclusterIndex;
 
-import dbengine.storage.ITuple;
 import dbengine.storage.GapLock;
+import dbengine.storage.ITuple;
+
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static dbms.SystemCatalog.END_DUMMY_TXN_ID_TAG;
 
@@ -12,15 +15,17 @@ public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
     NonUniqueIndexTuple prev;
     int txnId;
 
+    final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    final GapLock gapLock;
     public NonUniqueIndexTuple(ITuple raw) {
-        name = (String) raw.getOffsetValue(1);
-        primaryId = (Integer) raw.getOffsetValue(0);
+        this((String) raw.getOffsetValue(1), (Integer) raw.getOffsetValue(0), raw.getTxnId());
     }
 
     public NonUniqueIndexTuple(String name, int primaryId, int txnId) {
         this.name = name;
         this.primaryId = primaryId;
         this.txnId = txnId;
+        gapLock = new GapLock(prev, this);
     }
 
     @Override
@@ -51,11 +56,14 @@ public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
     }
 
     @Override
+    public ReadWriteLock getRWLock() {
+        return rwLock;
+    }
+
+
+    @Override
     public GapLock getGapLock() {
-        if (gapLockCnt.get() > 0) {
-            return new GapLock( prev, this.txnId == END_DUMMY_TXN_ID_TAG ? null : this);
-        }
-        return null;
+        return gapLock;
     }
 
     @Override
@@ -68,10 +76,6 @@ public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
         return next;
     }
 
-    @Override
-    public GapLock getPairGapLock() {
-        return null;
-    }
 
     @Override
     public int getTxnId() {
@@ -90,7 +94,7 @@ public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
 
     @Override
     public String toString() {
-        return  "[S_I]name='" + name + '\'' +
+        return  "[SEC_IDX]name='" + name + '\'' +
                 ", primaryId=" + primaryId;
     }
 }

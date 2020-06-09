@@ -2,7 +2,6 @@ package dbengine.transaction;
 
 
 import dbengine.storage.ITuple;
-import dbengine.storage.LockType;
 import dbengine.storage.clusterIndex.IPrimaryTuple;
 import dbengine.storage.multipleversion.IDeltaStorageRecordIterator;
 import dbengine.storage.multipleversion.IDeltaStorageRecordUpdater;
@@ -35,26 +34,17 @@ public class RepeatableRead implements IIsolationLevel {
             } else {
                 return readView.isVisble(ret.getTxnId()) ? ret : null;
             }
+        } else if (lockMode == LockMode.INSERT_INTENTION) {
+            addLock(lockMode, ret);
+            return ret;
         } else {
-            // 如果是唯一索引，等值查询（第一次树搜索），如果满足条件上行锁，如果不满足条件上间隙锁，且无下一个
-            if (strategy.isTreeSearch) {
-                if (strategy.meetCondition) {
-                    if (ret.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-                        addLock(lockMode, ret, LockType.RECORD_LOCK);
-                    }
-                    if (!ret.isUnique()) {
-                        addLock(lockMode, ret, LockType.GAP_LOCK);
-                    }
-                } else {
-                    addLock(lockMode, ret, LockType.GAP_LOCK);
-                    return SystemCatalog.INVALID_TUPLE;
-                }
-            } else {
-                addLock(lockMode, ret, LockType.GAP_LOCK);
-                if (ret.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-                    addLock(lockMode, ret, LockType.RECORD_LOCK);
-                }
+            if (!strategy.couldOptimizeToRecordLockOnly) {
+                addLock(LockMode.GAP_LOCK, ret);
             }
+            if (ret.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
+                addLock(lockMode, ret);
+            }
+
             return ret;
         }
     }
@@ -64,9 +54,9 @@ public class RepeatableRead implements IIsolationLevel {
                                  LockMode lockMode, boolean isTreeSearchLastNotMatchCondition) {
         if (isTreeSearchLastNotMatchCondition) {
             if (secondary != null) {
-                removeLock(lockMode, secondary, LockType.RECORD_LOCK);
-            } else {
-                removeLock(lockMode, primary, LockType.RECORD_LOCK);
+                removeLock(lockMode, secondary);
+            } else if (primary.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
+                removeLock(lockMode, primary);
             }
         }
     }

@@ -20,6 +20,4 @@ public interface ITuple<T extends ITuple> extends IDBLock, IMultipleVersion, Com
 
     ITuple next();
 
-    GapLock getPairGapLock();
-
 }

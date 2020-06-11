@@ -5,36 +5,41 @@ import dbms.SystemCatalog;
 import serverlayer.model.Predicate;
 
 public enum Expression {
-    LESS_EQUAL("<=") {
+    LESS_EQUAL("<=",0) {
         @Override
         public boolean check(Comparable a, Comparable b) {
             return a.compareTo(b) <= 0;
         }
-    }, LARGER_EQUAL(">=") {
+    }, LARGER_EQUAL(">=",1) {
         @Override
         public boolean check(Comparable a, Comparable b) {
             return a.compareTo(b) >= 0;
         }
-    },EQUAL("="){
+    },EQUAL("=",2){
         @Override
         public boolean check(Comparable a, Comparable b) {
             return a.compareTo(b) == 0;
         }
-    }, LARGER(">") {
+    }, LARGER(">",1) {
         @Override
         public boolean check(Comparable a, Comparable b) {
             return a.compareTo(b) > 0;
         }
-    }, LESS("<") {
+    }, LESS("<",0) {
         @Override
         public boolean check(Comparable a, Comparable b) {
             return a.compareTo(b) < 0;
         }
     };
     private String tag;
-
-    Expression(String tag) {
+    private int indexSelectionPriority;
+    Expression(String tag, int indexSelectionPriority) {
+        this.indexSelectionPriority = indexSelectionPriority;
         this.tag = tag;
+    }
+
+    public int getIndexSelectPriority() {
+        return indexSelectionPriority;
     }
 
     public abstract boolean check(Comparable a, Comparable b);

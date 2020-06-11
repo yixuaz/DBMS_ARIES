@@ -5,6 +5,7 @@ import dbms.DBClient;
 import isolationlevel.model.SqlMsg;
 import isolationlevel.model.WriteSkewTestThread;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -32,7 +33,7 @@ public class ReadRepeatableTest extends BaseTest {
         output.add("1:id=1, name='aaa', num=10");
         output.add("2:1 rows affected");
         output.add("2:id=1, name='aaa', num=11");
-        testTemplate(2, input, output);
+        concurrentTestTemplate(2, input, output);
     }
 
     @Test
@@ -52,7 +53,7 @@ public class ReadRepeatableTest extends BaseTest {
         output.add("1:no result found");
         output.add("1:no result found");
         output.add("3:id=1, name='aaa', num=10");
-        testTemplate(3, input, output);
+        concurrentTestTemplate(3, input, output);
     }
 
     @Test
@@ -69,7 +70,7 @@ public class ReadRepeatableTest extends BaseTest {
         output.add("2:1 rows affected");
         output.add("1:id=10, name='ddd', num=100");
         output.add("1:no result found");
-        testTemplate(2, input, output);
+        concurrentTestTemplate(2, input, output);
     }
 
     @Test
@@ -99,7 +100,7 @@ public class ReadRepeatableTest extends BaseTest {
         output.add("2:no result found");
         output.add("1:no result found");
         output.add("2:no result found");
-        testTemplate(2, input, output);
+        concurrentTestTemplate(2, input, output);
     }
 
     @Test
@@ -116,7 +117,7 @@ public class ReadRepeatableTest extends BaseTest {
         output.add("2:1 rows affected");
         output.add("1:id=5, name='5', num=5");
         output.add("1:id=7, name='ccc', num=200");
-        testTemplate(2, input, output);
+        concurrentTestTemplate(2, input, output);
     }
 
     @Test
@@ -134,7 +135,7 @@ public class ReadRepeatableTest extends BaseTest {
         output.add("2:id=5, name='5', num=5");
         output.add("2:id=6, name='6', num=6");
         output.add("2:id=7, name='ccc', num=200");
-        testTemplate(2, input, output);
+        concurrentTestTemplate(2, input, output);
     }
 
     @Test
@@ -150,7 +151,7 @@ public class ReadRepeatableTest extends BaseTest {
         output.add("1:id=7, name='ccc', num=200");
         output.add("1:no result found");
         output.add("2:1 rows affected");
-        testTemplate(2, input, output);
+        concurrentTestTemplate(2, input, output);
     }
 
 

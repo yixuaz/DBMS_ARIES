@@ -6,6 +6,8 @@ import serverlayer.model.InvalidSqlException;
 import serverlayer.model.LogicalPlan;
 import serverlayer.model.PhysicalPlan;
 
+import java.util.Collections;
+
 public class DBServer {
     // IMMUTABLE CLASS
     private static final SQLParser sqlParser = new SQLParser();
@@ -18,7 +20,7 @@ public class DBServer {
         logicalPlan.setTxnId(txnId);
         logicalPlan.setIsolationLevel(isolationLevel);
         if (noNeedOptimizer(sql)) {
-            return new PhysicalPlan(null, logicalPlan);
+            return new PhysicalPlan(Collections.emptyList(), logicalPlan);
         }
         logicalPlan.setReadView(isolationLevel.getTxnReadView());
         return optimizer.convertToPhysicalPlan(logicalPlan);

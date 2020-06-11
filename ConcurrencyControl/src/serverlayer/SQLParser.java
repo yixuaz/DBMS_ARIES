@@ -22,12 +22,14 @@ public class SQLParser {
     static final String VALUES_TAG = "values(";
     static final String SHARE_MODE_TAG = "lock in share mode";
     static final String EXLCUSIVE_MODE_TAG = "for update";
-    public LogicalPlan parse(String sql, int txnId) throws InvalidSqlException {
-        sql = sql.trim().replaceAll(" +"," ");
-        LogicalPlan rawPlan = new LogicalPlan();
-        if (sql.startsWith("select")) {
-            // assumption we only support select *
+    static final String SELECT = "select ";
+    static final String UPDATE = "update ";
+    static final String INSERT = "insert ";
 
+    public LogicalPlan parse(String sql, int txnId) throws InvalidSqlException {
+        sql = sql.trim().replaceAll(" +", " ");
+        LogicalPlan rawPlan = new LogicalPlan();
+        if (sql.startsWith(SELECT)) {
             LockMode mode = null;
             if (sql.endsWith(SHARE_MODE_TAG)) {
                 mode = LockMode.SHARE;
@@ -38,20 +40,39 @@ public class SQLParser {
             }
             rawPlan.setLockMode(mode);
             rawPlan.setTable(getTable(sql, TABLE_TAG));
-            rawPlan.setSelectedColumns(selectAll(rawPlan.getTable()));
+            rawPlan.setSelectedColumns(getSelections(sql, rawPlan.getTable()));
             rawPlan.setPredicates(getPredicate(rawPlan.getTable(), sql));
-        } else if (sql.startsWith("update")) {
+        } else if (sql.startsWith(UPDATE)) {
             rawPlan.setLockMode(LockMode.EXCLUSIVE);
-            rawPlan.setTable(getTable(sql, "update "));
+            rawPlan.setTable(getTable(sql, UPDATE));
             rawPlan.setSelectedColumns(selectAll(rawPlan.getTable()));
             rawPlan.setPredicates(getPredicate(rawPlan.getTable(), sql));
             rawPlan.setUpdatedValues(getUpdateFunction(rawPlan.getTable(), sql));
-        } else if (sql.startsWith("insert")) {
+        } else if (sql.startsWith(INSERT)) {
             rawPlan.setLockMode(LockMode.INSERT_INTENTION);
-            rawPlan.setTable(getTable(sql, "insert "));
+            rawPlan.setTable(getTable(sql, INSERT));
             rawPlan.setInsertTuple(getInsertTuple(sql, rawPlan.getTable(), txnId));
         }
+
         return rawPlan;
+    }
+
+    private List<Integer> getSelections(String sql, ITable table) throws InvalidSqlException {
+        int ed = sql.indexOf(TABLE_TAG);
+        if (ed == -1) {
+            throw new InvalidSqlException();
+        }
+        String rawSelectionsStr = sql.substring(SELECT.length(), ed).trim();
+        if ("*".equals(rawSelectionsStr)) {
+            return selectAll(table);
+        }
+        String[] selections = rawSelectionsStr.split(",");
+        TableSystemCatalog tableConfig = SystemCatalog.getTableConfig(table);
+        List<Integer> res = new ArrayList<>();
+        for (String columnName : selections) {
+            res.add(tableConfig.getOffset(columnName));
+        }
+        return res;
     }
 
     private ITuple getInsertTuple(String sql, ITable table, int txnId) throws InvalidSqlException {
@@ -66,10 +87,10 @@ public class SQLParser {
         int pid = rawPid.equals("null") ? SystemCatalog.NULL_PRIMARY_ID : Integer.parseInt(rawPid);
         TableSystemCatalog tableConfig = SystemCatalog.getTableConfig(table);
         List<Comparable> otherFields = new ArrayList<>();
-        for (int i = 1; i < table.columns(); i++) {
+        for (int i = 1; i < tableConfig.columns(); i++) {
             otherFields.add(tableConfig.toRealType(i, removeQuote(offsetValues[i].trim())));
         }
-        ITuple ret = table.getClusterIndex().buildInsertTuple(pid,txnId, otherFields.toArray(new Comparable[0]));
+        ITuple ret = table.getClusterIndex().buildInsertTuple(pid, txnId, otherFields.toArray(new Comparable[0]));
         return ret;
     }
 
@@ -133,8 +154,10 @@ public class SQLParser {
 
     private List<Integer> selectAll(ITable table) {
         List<Integer> selectAll = new ArrayList<>();
-        int all = table.columns();
-        for (int i = 0; i < all; i++) selectAll.add(i);
+        TableSystemCatalog tableConfig = SystemCatalog.getTableConfig(table);
+        for (int i = 0; i < tableConfig.columns(); i++) {
+            selectAll.add(i);
+        }
         return selectAll;
     }
 }

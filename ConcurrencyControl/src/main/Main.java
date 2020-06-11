@@ -1,75 +1,53 @@
 package main;
 
-import dbms.TransactionThread;
-import serverlayer.model.InvalidSqlException;
 import dbengine.transaction.IsolationLevel;
+import dbms.TransactionThread;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class Main {
-    public static void main(String[] args) throws InvalidSqlException, InterruptedException, ExecutionException {
+    public static void main(String[] args) throws Exception {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("welcome to tiny db isolation level exploration tool");
+        System.out.println("please input the client you want to create(eg. 2):");
+        ExecutorService es = null;
+        try {
+            int clientNum = Integer.parseInt(sc.nextLine().trim());
+            es = Executors.newFixedThreadPool(clientNum);
+            List<BlockingQueue<String>> msgQueues = new ArrayList<>();
 
-        BlockingQueue<String> txn1 = new LinkedBlockingQueue<>(), txn2 = new LinkedBlockingQueue<>();
+            for (int i = 1; i <= clientNum; i++) {
+                System.out.println("please input " + i + "th client isolation level (eg. NO, RU, RC, RR, SERIAL):");
+                msgQueues.add(new LinkedBlockingQueue<>());
+                es.submit(new TransactionThread(IsolationLevel.valueOf(sc.nextLine().trim().toUpperCase())
+                        , msgQueues.get(msgQueues.size() - 1)));
+            }
+            System.out.println("now you can send instruction to client by input 'clientId:sql'");
+            System.out.println("(eg. 1:select * from t)");
+            System.out.println("table name is t, there are 3 column (id(int)(primary_index), name(string)(non_unique_index), num(int)");
+            System.out.println("to see lock info, you can type 'clientId:print lock info'");
+            es.shutdown();
+            while (!es.isTerminated()) {
 
-        FutureTask<Void> ft2 = new FutureTask<>(new TransactionThread(IsolationLevel.RR, txn2)),
-                ft1 = new FutureTask<Void>(new TransactionThread(IsolationLevel.RR, txn1));
-        new Thread(ft1).start(); new Thread(ft2).start();
-
-        txn1.add("insert t values(5,5,5)");
-        Thread.sleep(1000);
-        txn2.add("select * from t where id > 3 for update");
-        Thread.sleep(1000);
-        txn1.add("insert t values(6,6,6)");
-        Thread.sleep(1000);
-        txn1.add("commit");
-        txn2.add("commit");
-        ft1.get(); ft2.get();
-    }
-
-    private static void testRangeSearch(BlockingQueue<String> txn1, BlockingQueue<String> txn2) throws InterruptedException {
-        txn1.add("select * from t");
-        Thread.sleep(100);
-        System.out.println();
-
-        txn1.add("select * from t where name <= \"ccb\"");
-
-        txn1.add("commit");
-
-        Thread.sleep(100);
-        System.out.println();
-
-        txn2.add("select * from t where num > 100");
-
-        txn2.add("commit");
-    }
-
-    private static void testUpdate(BlockingQueue<String> txn1, BlockingQueue<String> txn2) throws InterruptedException {
-        txn1.add("select * from t where id = 1");
-        Thread.sleep(100);
-        txn2.add("update t set num = 10 where name = \"bbb\"");
-        Thread.sleep(100);
-        txn1.add("select * from t where id = 2");
-        txn2.add("commit");
-        Thread.sleep(100);
-        txn1.add("select * from t where id = 3");
-        txn1.add("commit");
-    }
-
-    private static void testSelectForUpdate(BlockingQueue<String> txn1, BlockingQueue<String> txn2) throws InterruptedException {
-        txn1.add("select * from t where id = 1 for update");
-
-        txn1.add("select * from t where id = 3 for update");
-
-        Thread.sleep(100);
-        txn2.add("select * from t where name = \"bbb\" for update");
-
-        System.out.println("here");
-        Thread.sleep(1000);
-        txn1.add("commit");
-
-        txn2.add("commit");
+                String[] cmd = sc.nextLine().split(":");
+                try {
+                    int idx = Integer.parseInt(cmd[0]) - 1;
+                    String sql = cmd[1];
+                    msgQueues.get(idx).add(sql);
+                } catch (Exception e) {
+                    System.err.println("input error, try again: (eg. 1:select * from t)");
+                }
+            }
+        } catch (Exception e) {
+            if (es != null) {
+                es.shutdownNow();
+            }
+        }
     }
 }

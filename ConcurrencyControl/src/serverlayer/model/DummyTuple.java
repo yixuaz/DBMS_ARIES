@@ -16,6 +16,11 @@ public class DummyTuple implements ITuple {
         return next;
     }
 
+    @Override
+    public String getOffsetName(int columns) {
+        return null;
+    }
+
     // below is useless
 
     @Override

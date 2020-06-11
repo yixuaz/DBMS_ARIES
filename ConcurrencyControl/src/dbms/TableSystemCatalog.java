@@ -10,7 +10,7 @@ public class TableSystemCatalog {
     private Map<String, Integer> column2Offset = new HashMap<>();
     private Map<Integer, Converter> converters = new HashMap<>();
     private int primaryIndexOffset = 0;
-
+    private int columns = 3;
     interface Converter {
         Comparable convert(String s);
     }
@@ -35,5 +35,9 @@ public class TableSystemCatalog {
 
     public Comparable toRealType(int offset, String val) {
         return converters.get(offset).convert(val);
+    }
+
+    public int columns() {
+        return columns;
     }
 }

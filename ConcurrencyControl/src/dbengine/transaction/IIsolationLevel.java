@@ -10,19 +10,8 @@ import java.util.concurrent.locks.Lock;
 
 public interface IIsolationLevel {
     ITuple lockIfVisible(ITuple ret, LockMode lockMode, TxnReadView readView, LockStrategy strategy);
-//    default ITuple lockIfVisible(ITuple ret, LockMode lockMode, TxnReadView readView) {
-//        // we don't care if it is tree search  in RU AND RC
-//        return lockIfVisible(ret, lockMode, readView, null);
-//    }
 
     void unlockIfPossible(ITuple ret, ITuple backup, LockMode lockMode, boolean isTreeSearchLastNotMatchCondition);
-
-
-    // void insert(IIndex table, ITuple tuple);
-
-//    ITuple select(IIndex table, ITuple searchKey, LockMode mode);
-//
-//    ITuple next(ITuple prevTuple, LockMode mode);
 
     default void commit() {
         for (HoldLock lock : getHoldLocks()) {
@@ -50,6 +39,9 @@ public interface IIsolationLevel {
     List<HoldLock> getHoldLocks();
 
     default void printLockInfo() {
+        if (getHoldLocks().isEmpty()) {
+            System.out.println("no locks");
+        }
         for (HoldLock lock : getHoldLocks()) {
             System.out.println(lock);
         }

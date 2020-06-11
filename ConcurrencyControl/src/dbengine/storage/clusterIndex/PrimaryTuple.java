@@ -1,15 +1,13 @@
 package dbengine.storage.clusterIndex;
 
 import dbengine.storage.GapLock;
+import dbengine.storage.ITuple;
 import dbengine.storage.multipleversion.IDeltaStorageRecordIterator;
 import dbengine.storage.multipleversion.IDeltaStorageRecordUpdater;
-import dbengine.storage.ITuple;
+import util.MyReadWriteLock;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import static dbms.SystemCatalog.END_DUMMY_TXN_ID_TAG;
 
 public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
     int id;
@@ -18,7 +16,7 @@ public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
     IDeltaStorageRecordIterator prevVersionRecord;
     int txnId;
     PrimaryTuple next, prev;
-    final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    final ReadWriteLock rwLock = new MyReadWriteLock();
     final GapLock gapLock;
     public PrimaryTuple(int id, String name, int num, PrimaryTuple next, PrimaryTuple prev, int txnId) {
         this.id = id;
@@ -86,6 +84,13 @@ public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
     @Override
     public ITuple next() {
         return next;
+    }
+
+    @Override
+    public String getOffsetName(int columns) {
+        if (columns == 0) return "id";
+        else if (columns == 1) return "name";
+        else return "num";
     }
 
 

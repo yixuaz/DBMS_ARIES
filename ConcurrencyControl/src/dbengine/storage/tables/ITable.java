@@ -9,6 +9,5 @@ import java.util.List;
 public interface ITable {
     PrimaryIndex getClusterIndex();
     NonUniqueIndex getSecondaryIndex(int offset);
-    int columns();
     List<IIndex> secondaryIndexes();
 }

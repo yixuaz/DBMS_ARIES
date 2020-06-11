@@ -1,6 +1,5 @@
 package serverlayer.model;
 
-import dbengine.storage.Expression;
 import dbengine.storage.ITuple;
 import dbengine.storage.clusterIndex.PrimaryIndex;
 import dbengine.storage.nonclusterIndex.NonUniqueIndex;
@@ -9,6 +8,7 @@ import dbengine.transaction.IIsolationLevel;
 import dbengine.transaction.LockMode;
 import dbengine.transaction.TxnReadView;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -19,37 +19,36 @@ public class PhysicalPlan implements Iterator<ITuple> {
     public static final int primaryIndexScan = 2;
     
     public final int currentPlan;
-    Predicate targetPredicate;
+    final List<Predicate> targetPredicates;
     LogicalPlan logicalPlan;
 
     boolean targetIsTreeSearchWithEqualExp = false;
-    boolean lastIsInvalid = false;
+    boolean firstIsInvalid = false;
     ITuple curTuple;
-    ITuple nextTuple;
     private ITuple endDummy;
 
-    public PhysicalPlan(Predicate selectedPredicate, LogicalPlan logicalPlan) {
-        targetPredicate = selectedPredicate;
+    public PhysicalPlan(List<Predicate> selectedPredicate, LogicalPlan logicalPlan) {
+
+        targetPredicates = selectedPredicate;
         this.logicalPlan = logicalPlan;
         if (isSqlWithoutCRUD()) { // commit or begin
             currentPlan = -1;
             return;
         }
-        if (selectedPredicate == null) {
+        if (selectedPredicate.isEmpty()) {
             currentPlan = allTableScan;
-           // nextTuple = logicalPlan.table.getClusterIndex().firstTuple();
             curTuple = new DummyTuple(logicalPlan.table.getClusterIndex().firstTuple());
             endDummy = logicalPlan.table.getClusterIndex().endDummy();
-        } else if (selectedPredicate.offset == 1) {
+        } else if (selectedPredicate.get(0).offset == 1) {
             currentPlan = secondaryIndexScan;
-            NonUniqueIndex nameIndex = logicalPlan.table.getSecondaryIndex(selectedPredicate.offset);
+            NonUniqueIndex nameIndex = logicalPlan.table.getSecondaryIndex(selectedPredicate.get(0).offset);
             endDummy = nameIndex.endDummy();
-            fulfill(nameIndex.firstSearch(selectedPredicate));
+            fulfill(nameIndex.firstSearch(selectedPredicate.get(0)));
         } else {
             currentPlan = primaryIndexScan;
             PrimaryIndex primaryIndex = logicalPlan.table.getClusterIndex();
             endDummy = primaryIndex.endDummy();
-            fulfill(primaryIndex.firstSearch(selectedPredicate));
+            fulfill(primaryIndex.firstSearch(selectedPredicate.get(0)));
         }
     }
 
@@ -59,47 +58,33 @@ public class PhysicalPlan implements Iterator<ITuple> {
 
     private void fulfill(IndexSearchResult result) {
         curTuple = new DummyTuple(result.nextTuple);
-        // nextTuple = result.nextTuple;
         this.targetIsTreeSearchWithEqualExp = result.targetIsTreeSearchWithEqualExp;
-        this.lastIsInvalid = result.lastTupleIsInvalid;
+        this.firstIsInvalid = result.lastTupleIsInvalid;
     }
 
 
     @Override
     public boolean hasNext() {
-        // return nextTuple != null;
         return curTuple.next() != null;
     }
 
     @Override
     public ITuple next() {
-//        ITuple ret = nextTuple;
-//        boolean preLastIsInvalid = lastIsInvalid;
-//        nextTuple =  nextTuple.next();
-//
-//        if (targetPredicate != null) {
-//            lastIsInvalid = (nextTuple == endDummy) || (nextTuple == null) ||
-//                    !(targetPredicate.check(nextTuple.getOffsetValue(targetPredicate.offset)));
-//        }
-//        // 索引上的范围查询会访问到不满足条件的第一个值为止
-//        if (preLastIsInvalid) {
-//            nextTuple = null;
-//        }
-//
-//        return ret;
         curTuple = curTuple.next();
         ITuple ret = curTuple;
-        if (lastIsInvalid || curTuple == endDummy ||
-                (targetPredicate != null
-                        && !(targetPredicate.check(curTuple.getOffsetValue(targetPredicate.offset))))) {
+        if (firstIsInvalid || curTuple == endDummy || !statisfyAllTargetPredicates(curTuple)) {
             curTuple = new DummyTuple(null);
         }
         return ret;
     }
 
-    public int[] requiredColumnOffset() {
-        return new int[]{0,1,2};
-    } // should be get from logical plan
+    public boolean statisfyAllTargetPredicates(ITuple tuple) {
+        boolean res = true;
+        for (Predicate targetPredicate : targetPredicates) {
+            res &= targetPredicate.check(tuple.getOffsetValue(targetPredicate.offset));
+        }
+        return res;
+    }
 
     public LockMode getLockMode() {
         return logicalPlan.lockMode;
@@ -140,16 +125,6 @@ public class PhysicalPlan implements Iterator<ITuple> {
         return ret == endDummy;
     }
 
-    public ITuple getEndDummy() {
-        return endDummy;
-    }
+    public List<Integer> getSelectedColumns() { return logicalPlan.selectedColumns; }
 
-    public boolean meetCondition(ITuple find) {
-        if (targetPredicate == null) return true;
-        return targetPredicate.check(find);
-    }
-
-    public boolean isEqualExpPlan() {
-        return targetPredicate != null && Expression.isEqual(targetPredicate.expression);
-    }
 }

@@ -2,6 +2,7 @@ package isolationlevel;
 
 import dbengine.transaction.IsolationLevel;
 import isolationlevel.model.SqlMsg;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -28,7 +29,7 @@ public class ReadUncommitedTest extends BaseTest {
         output.add("1:id=1, name='aaa', num=10");
         output.add("2:1 rows affected");
         output.add("2:id=1, name='aaa', num=11");
-        testTemplate(2, input, output);
+        concurrentTestTemplate(2, input, output);
     }
 
     @Test
@@ -43,7 +44,7 @@ public class ReadUncommitedTest extends BaseTest {
         output.add("1:no result found");
         output.add("2:1 rows affected");
         output.add("1:id=1, name='aaa', num=10");
-        testTemplate(2, input, output);
+        concurrentTestTemplate(2, input, output);
     }
 
     @Test
@@ -71,7 +72,27 @@ public class ReadUncommitedTest extends BaseTest {
         output.add("1:id=2, name='bbb', num=10");
         output.add("1:id=3, name='bbb', num=10");
         output.add("1:id=7, name='ccc', num=15");
-        testTemplate(2, input, output);
+        concurrentTestTemplate(2, input, output);
+    }
+
+    @Test
+    public void testNoReaptableRead() throws Exception {
+        List<SqlMsg> input = new ArrayList<>();
+        input.add(new SqlMsg(0, "select * from t where num = 10"));
+        input.add(new SqlMsg(1, "update t set num = 10 where id = 1"));
+        input.add(new SqlMsg(0, "select * from t where num = 10"));
+        input.add(new SqlMsg(1, "commit"));
+        input.add(new SqlMsg(0, "select * from t where num = 10"));
+        input.add(new SqlMsg(0, "commit"));
+        input.add(new SqlMsg(2, "select * from t where num = 10"));
+        input.add(new SqlMsg(2, "commit"));
+        List<String> output = new ArrayList<>();
+        output.add("1:no result found");
+        output.add("2:1 rows affected");
+        output.add("1:id=1, name='aaa', num=10");
+        output.add("1:id=1, name='aaa', num=10");
+        output.add("3:id=1, name='aaa', num=10");
+        concurrentTestTemplate(3, input, output);
     }
 
 

@@ -1,6 +1,12 @@
 package dbengine.transaction;
 
 public enum IsolationLevel {
+    NO {
+        @Override
+        public IIsolationLevel getIIsolationLevel() {
+            return new NoTransactionProtect();
+        }
+    },
     RU{
         @Override
         public IIsolationLevel getIIsolationLevel() {
@@ -19,7 +25,7 @@ public enum IsolationLevel {
     }, SERIAL {
         @Override
         public IIsolationLevel getIIsolationLevel() {
-            return null;
+            return new Serializable();
         }
     };
     public abstract IIsolationLevel getIIsolationLevel();

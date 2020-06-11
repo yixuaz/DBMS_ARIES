@@ -1,6 +1,9 @@
 package dbengine.transaction;
 
 import dbengine.storage.IDBLock;
+import dbms.SystemCatalog;
+
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public enum LockMode {
     SHARE {
@@ -46,5 +49,6 @@ public enum LockMode {
     };
 
     public abstract void lock(IDBLock lock);
+
     public abstract void unlock(IDBLock lock);
 }

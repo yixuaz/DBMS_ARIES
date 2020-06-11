@@ -1,19 +1,18 @@
 package dbengine;
 
 import dbengine.storage.IIndex;
+import dbengine.storage.ITuple;
 import dbengine.storage.IUniqueIndex;
+import dbengine.storage.clusterIndex.IPrimaryTuple;
+import dbengine.storage.multipleversion.DeltaStorageRecord;
 import dbengine.storage.tables.ITable;
+import dbengine.transaction.IIsolationLevel;
 import dbengine.transaction.LockMode;
 import dbengine.transaction.LockStrategy;
 import dbms.DBEngineGlobalEnvironment;
-import dbms.SystemCatalog;
 import serverlayer.model.PhysicalPlan;
 import serverlayer.model.Predicate;
 import serverlayer.model.UpdatedFunction;
-import dbengine.storage.multipleversion.DeltaStorageRecord;
-import dbengine.storage.ITuple;
-import dbengine.storage.clusterIndex.IPrimaryTuple;
-import dbengine.transaction.IIsolationLevel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,12 +32,13 @@ public class DBEngine implements IDBEngine{
     }
 
     public String getNextRow() {
-        IPrimaryTuple ret = next();
-        return ret == null ? null : ret.toString();
+        ITuple ret = next();
+        return ret == null ? null : ret.toString(physicalPlan.getSelectedColumns());
     }
 
-    private IPrimaryTuple next() {
-        if (!physicalPlan.hasNext()) return null;
+    private ITuple next() {
+        if (!physicalPlan.hasNext())
+            return null;
         IIsolationLevel isolationLevel = physicalPlan.getIsolationLevel();
 
         ITuple ret = physicalPlan.next(), backup = null;
@@ -46,10 +46,14 @@ public class DBEngine implements IDBEngine{
         Boolean needBackToPrimary = null; // 是否需要回表
 
         if (needBackToPrimary == null)  {
-            needBackToPrimary = true;
-            for (int requiredColumnOffset : physicalPlan.requiredColumnOffset()) {
-                needBackToPrimary &= ret.haveOffsetValue(requiredColumnOffset);
+            needBackToPrimary = false;
+            for (int requiredColumnOffset : physicalPlan.getSelectedColumns()) {
+                needBackToPrimary |= !ret.haveOffsetValue(requiredColumnOffset);
             }
+            for (Predicate predicateColumnOffset : physicalPlan.getProjection()) {
+                needBackToPrimary |= !ret.haveOffsetValue(predicateColumnOffset.getOffset());
+            }
+            needBackToPrimary |= (physicalPlan.getUpdateFunction() != null && !physicalPlan.getUpdateFunction().isEmpty());
         }
 
         // enhance 负责 判断可见性， 如可见根据隔离级别来加锁
@@ -64,8 +68,8 @@ public class DBEngine implements IDBEngine{
         boolean meetAllProjection = false;
         if (physicalPlan.isEndDummy(ret)) return null;
 
-        if (!needBackToPrimary) { // go back to primary index
-            if (physicalPlan.meetCondition(ret)) {
+        if (needBackToPrimary) { // go back to primary index
+            if (physicalPlan.statisfyAllTargetPredicates(ret)) {
                 backup = ret;
                 ret = physicalPlan.findInPrimaryIndex(backup);
                 strategy = new LockStrategy(true);
@@ -84,7 +88,7 @@ public class DBEngine implements IDBEngine{
             isFirstNotMeetCondition = false;
             return next();
         }
-        return (IPrimaryTuple) ret;
+        return ret;
     }
 
     public void commit() {
@@ -93,7 +97,7 @@ public class DBEngine implements IDBEngine{
     }
 
     public int updateNextRow() {
-        IPrimaryTuple ret = next();
+        IPrimaryTuple ret = (IPrimaryTuple) next();
         return ret == null ? -1 : update(ret, physicalPlan.getUpdateFunction(), physicalPlan.getTxnId());
     }
 
@@ -135,6 +139,7 @@ public class DBEngine implements IDBEngine{
             for (IIndex index : table.secondaryIndexes()) {
                 physicalPlan.getIsolationLevel().lockIfVisible(index.findTuple(toBeAdd), mode, null,null);
             }
+            // insert then add record lock
             ITuple ret;
             if ((ret = table.getClusterIndex().insert(toBeAdd)) == null) {
                 throw new IllegalStateException("invalid area primary index");
@@ -148,6 +153,4 @@ public class DBEngine implements IDBEngine{
             return toBeAdd;
         }
     }
-
-    // public boolean insert()
 }

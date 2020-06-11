@@ -2,11 +2,9 @@ package dbengine.storage.nonclusterIndex;
 
 import dbengine.storage.GapLock;
 import dbengine.storage.ITuple;
+import util.MyReadWriteLock;
 
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import static dbms.SystemCatalog.END_DUMMY_TXN_ID_TAG;
 
 public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
     String name;
@@ -15,7 +13,7 @@ public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
     NonUniqueIndexTuple prev;
     int txnId;
 
-    final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    final ReadWriteLock rwLock = new MyReadWriteLock();
     final GapLock gapLock;
     public NonUniqueIndexTuple(ITuple raw) {
         this((String) raw.getOffsetValue(1), (Integer) raw.getOffsetValue(0), raw.getTxnId());
@@ -74,6 +72,13 @@ public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
     @Override
     public ITuple next() {
         return next;
+    }
+
+    @Override
+    public String getOffsetName(int columns) {
+        if (columns == 0) return "id";
+        else if (columns == 1) return "name";
+        return null;
     }
 
 

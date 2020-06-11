@@ -24,11 +24,6 @@ public class MyTable implements ITable {
     }
 
     @Override
-    public int columns() {
-        return 3;
-    }
-
-    @Override
     public List<IIndex> secondaryIndexes() {
         return Collections.unmodifiableList(secondaryIndexes);
     }

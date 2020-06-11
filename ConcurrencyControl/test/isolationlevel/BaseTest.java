@@ -1,12 +1,16 @@
 package isolationlevel;
 
+import dbengine.transaction.IIsolationLevel;
 import dbengine.transaction.IsolationLevel;
+import dbms.DBClient;
 import dbms.SystemCatalog;
 import dbms.TransactionThread;
 import isolationlevel.model.SqlMsg;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Test;
+import serverlayer.model.InvalidSqlException;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -39,7 +43,7 @@ public abstract class BaseTest {
         System.setOut(originalOut);
     }
 
-    protected void testTemplate(int txnNums, List<SqlMsg> msgs, List<String> assertContents) throws InterruptedException, IOException, ExecutionException {
+    protected void concurrentTestTemplate(int txnNums, List<SqlMsg> msgs, List<String> assertContents) throws InterruptedException, IOException, ExecutionException {
         List<BlockingQueue<String>> txns = new ArrayList<>();
         List<FutureTask> futureTasks = new ArrayList<>();
         for (int i = 0; i < txnNums; i++) {
@@ -51,7 +55,7 @@ public abstract class BaseTest {
         boolean isFirstMsg = true;
         for (SqlMsg sql : msgs) {
             txns.get(sql.getTxnId()).add(sql.getSql());
-            Thread.sleep(isFirstMsg ? 200 : 50);
+            Thread.sleep(isFirstMsg ? 130 : 5);
             isFirstMsg = false;
         }
         for (FutureTask ft : futureTasks) ft.get();
@@ -65,5 +69,115 @@ public abstract class BaseTest {
             }
             Assert.assertTrue(br.readLine() == null);
         }
+    }
+
+    @Test
+    public void testSelectOnePrimaryKey() throws Exception {
+        List<String> outputs = DBClient.execute("select name from t where id = 1",
+                getIsolationLevel().getIIsolationLevel());
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:name='aaa'",outputs.get(0));
+    }
+
+    @Test
+    public void testSelectBySecondaryIndex() throws Exception {
+        List<String> outputs = DBClient.execute("select num from t where name = 'aaa'",
+                getIsolationLevel().getIIsolationLevel());
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:num=100",outputs.get(0));
+
+
+    }
+
+    @Test
+    public void testSelectByNonIndex() throws Exception{
+        List<String> outputs = DBClient.execute("select id from t where num = 100",
+                getIsolationLevel().getIIsolationLevel());
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:id=1",outputs.get(0));
+    }
+
+    @Test
+    public void testSelectByMultiplePredicate() throws Exception{
+        List<String> outputs = DBClient.execute("select id,name from t where name > 'aaa' and num <= 200",
+                getIsolationLevel().getIIsolationLevel());
+        Assert.assertEquals(2, outputs.size());
+        Assert.assertEquals("1:id=2, name='bbb'",outputs.get(0));
+        Assert.assertEquals("1:id=7, name='ccc'",outputs.get(1));
+    }
+
+    @Test
+    public void testSelectByMultiplePredicate2() throws Exception{
+        List<String> outputs = DBClient.execute("select name from t where name > 'aaa' and name <= 'bbc'",
+                getIsolationLevel().getIIsolationLevel(), true);
+        Assert.assertEquals(2, outputs.size());
+        Assert.assertEquals("1:[SEC_IDX]name='bbb'",outputs.get(0));
+        Assert.assertEquals("1:[SEC_IDX]name='bbb'",outputs.get(1));
+    }
+
+    @Test
+    public void testSelectByMultiplePredicate3() throws Exception {
+        List<String> outputs = DBClient.execute("select * from t where id > 10 and id < 5",
+                getIsolationLevel().getIIsolationLevel(), true);
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:no result found",outputs.get(0));
+    }
+
+    @Test
+    public void testInsertFailed() throws Exception {
+        List<String> outputs = DBClient.execute("insert t values(1,'1',1)",
+                getIsolationLevel().getIIsolationLevel(), true);
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:0 rows affected",outputs.get(0));
+    }
+
+    @Test
+    public void testInsertSuccess() throws Exception {
+        IIsolationLevel isolationLevel = getIsolationLevel().getIIsolationLevel();
+        List<String> outputs = DBClient.execute("insert t values(5,'5',5)",
+                isolationLevel);
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:1 rows affected",outputs.get(0));
+        outputs = DBClient.execute("select * from t where id = 5",
+                isolationLevel, true);
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:id=5, name='5', num=5",outputs.get(0));
+    }
+
+    @Test
+    public void testUpdateZeroRow() throws Exception{
+        List<String> outputs = DBClient.execute("update t set num=100 where num = 100",
+                getIsolationLevel().getIIsolationLevel(), true);
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:0 rows affected",outputs.get(0));
+    }
+
+    @Test
+    public void testUpdateOneRow() throws Exception{
+        IIsolationLevel isolationLevel = getIsolationLevel().getIIsolationLevel();
+        List<String> outputs = DBClient.execute("update t set num=100 where id = 2",
+                isolationLevel);
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:1 rows affected",outputs.get(0));
+        outputs = DBClient.execute("select * from t where id = 2",
+                isolationLevel, true);
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:id=2, name='bbb', num=100",outputs.get(0));
+    }
+
+    @Test
+    public void testUpdateTwoRow() throws Exception{
+        IIsolationLevel isolationLevel = getIsolationLevel().getIIsolationLevel();
+        List<String> outputs = DBClient.execute("update t set num=0 where name = 'bbb'",
+                isolationLevel);
+        Assert.assertEquals(1, outputs.size());
+        Assert.assertEquals("1:2 rows affected",outputs.get(0));
+        outputs = DBClient.execute("select * from t",
+                isolationLevel, true);
+        Assert.assertEquals(4, outputs.size());
+        Assert.assertEquals("1:id=1, name='aaa', num=100",outputs.get(0));
+        Assert.assertEquals("1:id=2, name='bbb', num=0",outputs.get(1));
+        Assert.assertEquals("1:id=3, name='bbb', num=0",outputs.get(2));
+        Assert.assertEquals("1:id=7, name='ccc', num=200",outputs.get(3));
     }
 }

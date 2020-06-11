@@ -124,6 +124,37 @@ public class ReadRepeatableLockTest extends BaseTest {
                 ));
     }
 
+    @Test
+    public void testPrimaryKeyMultiplePredicateSearch() throws Exception{
+        testTemplate("select * from t where id <= 4 and id > 1 for update",
+                Arrays.asList(
+                        "1:id=2, name='bbb', num=200",
+                        "1:id=3, name='bbb', num=300",
+                        "GAP_LOCK(1,2),id=2, name='bbb', num=200",
+                        "EXCLUSIVE_LOCK,id=2, name='bbb', num=200",
+                        "GAP_LOCK(2,3),id=3, name='bbb', num=300",
+                        "EXCLUSIVE_LOCK,id=3, name='bbb', num=300",
+                        "GAP_LOCK(3,7),id=7, name='ccc', num=200"
+                        ));
+    }
+
+    @Test
+    public void testPrimaryKeyMultiplePredicateSearch2() throws Exception{
+        testTemplate("select * from t where id > 1 and id < 2 for update",
+                Arrays.asList(
+                        "1:no result found",
+                        "GAP_LOCK(1,2),id=2, name='bbb', num=200"
+                ));
+    }
+
+    @Test
+    public void testPrimaryKeyMultiplePredicateSearch3() throws Exception{
+        testTemplate("select * from t where id = 2 and id < 1 for update",
+                Arrays.asList(
+                        "1:no result found"
+                ));
+    }
+
     // test secondary index search, the locks added
     @Test
     public void testSecKeyEqualSearch() throws Exception {
@@ -246,6 +277,27 @@ public class ReadRepeatableLockTest extends BaseTest {
     @Test
     public void testSecKeyLessEqualNotMatchSearch() throws Exception{
         testTemplate("select * from t where name <= 'aac' for update",
+                Arrays.asList(
+                        "1:id=1, name='aaa', num=100",
+                        "GAP_LOCK(-inf,aaa:1),[SEC_IDX]name='aaa', primaryId=1",
+                        "EXCLUSIVE_LOCK,[SEC_IDX]name='aaa', primaryId=1",
+                        "EXCLUSIVE_LOCK,id=1, name='aaa', num=100",
+                        "GAP_LOCK(aaa:1,bbb:2),[SEC_IDX]name='bbb', primaryId=2"
+                ));
+    }
+
+    @Test
+    public void testSecKeyMultiplePredicateSearch() throws Exception{
+        testTemplate("select * from t where name > 'aaa' and name <= 'aac' for update",
+                Arrays.asList(
+                        "1:no result found",
+                        "GAP_LOCK(aaa:1,bbb:2),[SEC_IDX]name='bbb', primaryId=2"
+                ));
+    }
+
+    @Test
+    public void testSecKeyMultiplePredicateSearch2() throws Exception{
+        testTemplate("select * from t where name >= 'aaa' and name <= 'aac' for update",
                 Arrays.asList(
                         "1:id=1, name='aaa', num=100",
                         "GAP_LOCK(-inf,aaa:1),[SEC_IDX]name='aaa', primaryId=1",

@@ -7,4 +7,8 @@ public class InvalidSqlException extends Exception {
     public InvalidSqlException(String message) {
         super(message);
     }
+
+    public InvalidSqlException(Throwable cause) {
+        super(cause);
+    }
 }

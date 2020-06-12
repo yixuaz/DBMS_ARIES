@@ -9,16 +9,18 @@ import serverlayer.model.PhysicalPlan;
 import java.util.Collections;
 
 public class DBServer {
-    // IMMUTABLE CLASS
     private static final SQLParser sqlParser = new SQLParser();
     private static final Optimizer optimizer = new Optimizer();
 
     public static PhysicalPlan generatePhysicalPlan(String sql, IIsolationLevel isolationLevel) throws InvalidSqlException {
+        // 1. get txn id
         long clientId = Thread.currentThread().getId();
         Integer txnId = SystemCatalog.getTxnId(clientId);
+        // 2. sql -> logical plan
         LogicalPlan logicalPlan = sqlParser.parse(sql, txnId);
         logicalPlan.setTxnId(txnId);
         logicalPlan.setIsolationLevel(isolationLevel);
+        // 3. logical plan -> physical plan
         if (noNeedOptimizer(sql)) {
             return new PhysicalPlan(Collections.emptyList(), logicalPlan);
         }

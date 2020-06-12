@@ -3,8 +3,8 @@ package serverlayer.model;
 import dbengine.storage.ITuple;
 import dbengine.storage.tables.ITable;
 import dbengine.transaction.IIsolationLevel;
-import dbengine.transaction.LockMode;
-import dbengine.transaction.TxnReadView;
+import dbengine.transaction.model.LockMode;
+import dbengine.transaction.model.TxnReadView;
 
 import java.util.List;
 

@@ -9,7 +9,6 @@ public class TableSystemCatalog {
     // hard code for myTable
     private Map<String, Integer> column2Offset = new HashMap<>();
     private Map<Integer, Converter> converters = new HashMap<>();
-    private int primaryIndexOffset = 0;
     private int columns = 3;
     interface Converter {
         Comparable convert(String s);
@@ -19,9 +18,9 @@ public class TableSystemCatalog {
         column2Offset.put("id", 0);
         column2Offset.put("name", 1);
         column2Offset.put("num", 2);
-        converters.put(0, (s)->Integer.parseInt(s));
-        converters.put(1, (s)->s);
-        converters.put(2, (s)->Integer.parseInt(s));
+        converters.put(0, Integer::parseInt);
+        converters.put(1, s->s);
+        converters.put(2, Integer::parseInt);
         otherIndexsOffsets.add(1);
     }
 

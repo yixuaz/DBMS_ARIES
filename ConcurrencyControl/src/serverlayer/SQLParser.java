@@ -5,7 +5,7 @@ import dbms.SystemCatalog;
 import dbms.TableSystemCatalog;
 import dbengine.storage.Expression;
 import dbengine.storage.tables.ITable;
-import dbengine.transaction.LockMode;
+import dbengine.transaction.model.LockMode;
 import serverlayer.model.InvalidSqlException;
 import serverlayer.model.LogicalPlan;
 import serverlayer.model.Predicate;
@@ -16,6 +16,7 @@ import java.util.List;
 
 // this is toy code which have a lot of assumption in input
 public class SQLParser {
+    static final String AND_TAG = "and";
     static final String TABLE_TAG = "from ";
     static final String WHERE_TAG = "where ";
     static final String SET_TAG = "set ";
@@ -27,34 +28,38 @@ public class SQLParser {
     static final String INSERT = "insert ";
 
     public LogicalPlan parse(String sql, int txnId) throws InvalidSqlException {
-        sql = sql.trim().replaceAll(" +", " ");
-        LogicalPlan rawPlan = new LogicalPlan();
-        if (sql.startsWith(SELECT)) {
-            LockMode mode = null;
-            if (sql.endsWith(SHARE_MODE_TAG)) {
-                mode = LockMode.SHARE;
-                sql = sql.substring(0, sql.length() - SHARE_MODE_TAG.length()).trim();
-            } else if (sql.endsWith(EXLCUSIVE_MODE_TAG)) {
-                mode = LockMode.EXCLUSIVE;
-                sql = sql.substring(0, sql.length() - EXLCUSIVE_MODE_TAG.length()).trim();
+        try {
+            sql = sql.trim().replaceAll(" +", " ");
+            LogicalPlan rawPlan = new LogicalPlan();
+            if (sql.startsWith(SELECT)) {
+                LockMode mode = null;
+                if (sql.endsWith(SHARE_MODE_TAG)) {
+                    mode = LockMode.SHARE;
+                    sql = sql.substring(0, sql.length() - SHARE_MODE_TAG.length()).trim();
+                } else if (sql.endsWith(EXLCUSIVE_MODE_TAG)) {
+                    mode = LockMode.EXCLUSIVE;
+                    sql = sql.substring(0, sql.length() - EXLCUSIVE_MODE_TAG.length()).trim();
+                }
+                rawPlan.setLockMode(mode);
+                rawPlan.setTable(getTable(sql, TABLE_TAG));
+                rawPlan.setSelectedColumns(getSelections(sql, rawPlan.getTable()));
+                rawPlan.setPredicates(getPredicate(rawPlan.getTable(), sql));
+            } else if (sql.startsWith(UPDATE)) {
+                rawPlan.setLockMode(LockMode.EXCLUSIVE);
+                rawPlan.setTable(getTable(sql, UPDATE));
+                rawPlan.setSelectedColumns(selectAll(rawPlan.getTable()));
+                rawPlan.setPredicates(getPredicate(rawPlan.getTable(), sql));
+                rawPlan.setUpdatedValues(getUpdateFunction(rawPlan.getTable(), sql));
+            } else if (sql.startsWith(INSERT)) {
+                rawPlan.setLockMode(LockMode.INSERT_INTENTION);
+                rawPlan.setTable(getTable(sql, INSERT));
+                rawPlan.setInsertTuple(getInsertTuple(sql, rawPlan.getTable(), txnId));
             }
-            rawPlan.setLockMode(mode);
-            rawPlan.setTable(getTable(sql, TABLE_TAG));
-            rawPlan.setSelectedColumns(getSelections(sql, rawPlan.getTable()));
-            rawPlan.setPredicates(getPredicate(rawPlan.getTable(), sql));
-        } else if (sql.startsWith(UPDATE)) {
-            rawPlan.setLockMode(LockMode.EXCLUSIVE);
-            rawPlan.setTable(getTable(sql, UPDATE));
-            rawPlan.setSelectedColumns(selectAll(rawPlan.getTable()));
-            rawPlan.setPredicates(getPredicate(rawPlan.getTable(), sql));
-            rawPlan.setUpdatedValues(getUpdateFunction(rawPlan.getTable(), sql));
-        } else if (sql.startsWith(INSERT)) {
-            rawPlan.setLockMode(LockMode.INSERT_INTENTION);
-            rawPlan.setTable(getTable(sql, INSERT));
-            rawPlan.setInsertTuple(getInsertTuple(sql, rawPlan.getTable(), txnId));
-        }
 
-        return rawPlan;
+            return rawPlan;
+        } catch (Exception e) {
+            throw new InvalidSqlException(e);
+        }
     }
 
     private List<Integer> getSelections(String sql, ITable table) throws InvalidSqlException {
@@ -81,7 +86,7 @@ public class SQLParser {
             throw new InvalidSqlException("invalid insert sql syntax");
         }
         idx += VALUES_TAG.length();
-        int end = sql.indexOf(")", idx);
+        int end = sql.indexOf(')', idx);
         String[] offsetValues = sql.substring(idx, end).split(",");
         String rawPid = offsetValues[0].trim();
         int pid = rawPid.equals("null") ? SystemCatalog.NULL_PRIMARY_ID : Integer.parseInt(rawPid);
@@ -131,7 +136,7 @@ public class SQLParser {
         idx += WHERE_TAG.length();
         int end = sql.length();
         String whereCondition = sql.substring(idx, end).trim();
-        String[] conditions = whereCondition.split("and");
+        String[] conditions = whereCondition.split(AND_TAG);
         for (String condition : conditions) {
             ret.add(Expression.generatedPredicate(condition, table));
         }
@@ -144,7 +149,7 @@ public class SQLParser {
             throw new InvalidSqlException();
         }
         idx += table_tag.length();
-        int end = sql.indexOf(" ", idx);
+        int end = sql.indexOf(' ', idx);
         if (end < 0) {
             end = sql.length();
         }

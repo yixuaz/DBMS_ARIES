@@ -1,4 +1,4 @@
-package dbengine.transaction;
+package dbengine.transaction.model;
 
 import dbms.DBEngineGlobalEnvironment;
 import dbms.SystemCatalog;
@@ -6,8 +6,8 @@ import dbms.SystemCatalog;
 import java.util.SortedSet;
 
 public class TxnReadView {
-    final SortedSet<Integer> unCommittedTxnGroup;
-    final int lowWaterMark, highWaterMark, createdTxnId;
+    private final SortedSet<Integer> unCommittedTxnGroup;
+    private final int lowWaterMark, highWaterMark, createdTxnId;
 
     public TxnReadView(int curTxnId) {
         unCommittedTxnGroup = DBEngineGlobalEnvironment.getUnCommitedTxnGroup();

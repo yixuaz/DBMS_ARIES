@@ -1,23 +1,33 @@
-package dbengine.transaction;
+package dbengine.transaction.model;
 
-public enum IsolationLevel {
-    NO {
+import dbengine.transaction.IIsolationLevel;
+import dbengine.transaction.NoTransactionProtect;
+import dbengine.transaction.ReadComitted;
+import dbengine.transaction.ReadUncomitted;
+import dbengine.transaction.RepeatableRead;
+import dbengine.transaction.Serializable;
+
+/**
+ * a IIsolationLevel factory class
+ */
+public enum IsolationLevelType {
+    NO { // dirty write, dirty read, read skew, write skew, phantom read
         @Override
         public IIsolationLevel getIIsolationLevel() {
             return new NoTransactionProtect();
         }
     },
-    RU{
+    RU { // dirty read, read skew, write skew, phantom read
         @Override
         public IIsolationLevel getIIsolationLevel() {
             return new ReadUncomitted();
         }
-    }, RC {
+    }, RC { // read skew, write skew, phantom read
         @Override
         public IIsolationLevel getIIsolationLevel() {
             return new ReadComitted();
         }
-    }, RR {
+    }, RR { // write skew
         @Override
         public IIsolationLevel getIIsolationLevel() {
             return new RepeatableRead();
@@ -28,5 +38,6 @@ public enum IsolationLevel {
             return new Serializable();
         }
     };
+
     public abstract IIsolationLevel getIIsolationLevel();
 }

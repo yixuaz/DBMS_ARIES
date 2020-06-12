@@ -1,6 +1,6 @@
 package isolationlevel.model;
 
-import dbengine.transaction.IsolationLevel;
+import dbengine.transaction.model.IsolationLevelType;
 import dbms.DBClient;
 import dbms.TransactionThread;
 
@@ -8,7 +8,8 @@ import java.util.List;
 
 public class WriteSkewTestThread extends TransactionThread {
     private final int myPrimaryId;
-    public WriteSkewTestThread(IsolationLevel isolationLevel, int myId) {
+
+    public WriteSkewTestThread(IsolationLevelType isolationLevel, int myId) {
         super(isolationLevel, null);
         myPrimaryId = myId;
     }
@@ -36,6 +37,6 @@ public class WriteSkewTestThread extends TransactionThread {
     }
 
     private boolean isTxnProtect() {
-        return isolationLevel != IsolationLevel.NO;
+        return isolationLevel != IsolationLevelType.NO;
     }
 }

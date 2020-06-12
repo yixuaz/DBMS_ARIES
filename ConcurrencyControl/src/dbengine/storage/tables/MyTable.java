@@ -1,8 +1,8 @@
 package dbengine.storage.tables;
 
 import dbengine.storage.IIndex;
-import dbengine.storage.clusterIndex.PrimaryIndex;
-import dbengine.storage.nonclusterIndex.NonUniqueIndex;
+import dbengine.storage.clusterindex.PrimaryIndex;
+import dbengine.storage.nonclusterindex.NonUniqueIndex;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -10,9 +10,9 @@ import java.util.Collections;
 import java.util.List;
 
 public class MyTable implements ITable {
-    final PrimaryIndex clusterIndexTable = new PrimaryIndex();
-    final NonUniqueIndex nameIndexTable = new NonUniqueIndex();
-    final List<IIndex> secondaryIndexes = new ArrayList<>(Arrays.asList(nameIndexTable));
+    private final PrimaryIndex clusterIndexTable = new PrimaryIndex();
+    private final NonUniqueIndex nameIndexTable = new NonUniqueIndex();
+    private final List<IIndex> secondaryIndexes = new ArrayList<>(Arrays.asList(nameIndexTable));
     public PrimaryIndex getClusterIndex() {
         return clusterIndexTable;
     }

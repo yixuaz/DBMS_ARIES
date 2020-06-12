@@ -1,6 +1,6 @@
 package isolationlevel;
 
-import dbengine.transaction.IsolationLevel;
+import dbengine.transaction.model.IsolationLevelType;
 import dbms.DBClient;
 import isolationlevel.model.SqlMsg;
 import isolationlevel.model.WriteSkewTestThread;
@@ -14,8 +14,8 @@ import java.util.concurrent.FutureTask;
 public class NoTxnProtectTest extends BaseTest {
 
     @Override
-    public IsolationLevel getIsolationLevel() {
-        return IsolationLevel.NO;
+    public IsolationLevelType getIsolationLevel() {
+        return IsolationLevelType.NO;
     }
 
     @Test

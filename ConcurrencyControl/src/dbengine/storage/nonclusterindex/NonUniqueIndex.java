@@ -1,10 +1,8 @@
-package dbengine.storage.nonclusterIndex;
+package dbengine.storage.nonclusterindex;
 
 import dbengine.storage.Expression;
 import dbengine.storage.IIndex;
 import dbengine.storage.ITuple;
-import dbengine.storage.GapLock;
-import dbengine.storage.multipleversion.IMultipleVersion;
 import serverlayer.model.IndexSearchResult;
 import serverlayer.model.Predicate;
 
@@ -14,13 +12,14 @@ import static dbms.SystemCatalog.END_DUMMY_TXN_ID_TAG;
 
 public class NonUniqueIndex implements IIndex {
     private static final NonUniqueIndexTuple endDummy
-            = new NonUniqueIndexTuple(null,0, END_DUMMY_TXN_ID_TAG);
-    TreeSet<NonUniqueIndexTuple> datas = new TreeSet<>();
-    {
-        datas.add(new NonUniqueIndexTuple("aaa", 1,0));
-        datas.add(new NonUniqueIndexTuple("bbb", 2,0));
-        datas.add(new NonUniqueIndexTuple("bbb", 3,0));
-        datas.add(new NonUniqueIndexTuple("ccc", 7,0));
+            = new NonUniqueIndexTuple(null, 0, END_DUMMY_TXN_ID_TAG);
+    private TreeSet<NonUniqueIndexTuple> datas = new TreeSet<>();
+
+    public NonUniqueIndex() {
+        datas.add(new NonUniqueIndexTuple("aaa", 1, 0));
+        datas.add(new NonUniqueIndexTuple("bbb", 2, 0));
+        datas.add(new NonUniqueIndexTuple("bbb", 3, 0));
+        datas.add(new NonUniqueIndexTuple("ccc", 7, 0));
         NonUniqueIndexTuple pre = null;
         for (NonUniqueIndexTuple cur : datas) {
             if (pre != null) {
@@ -32,14 +31,15 @@ public class NonUniqueIndex implements IIndex {
         }
         endDummy.prev = pre;
         endDummy.getGapLock().refresh();
-        pre.next = endDummy;
+        if (pre != null) {
+            pre.next = endDummy;
+        }
     }
-
 
 
     @Override
     public ITuple findTuple(ITuple searchKey) {
-        ITuple ret;
+        ITuple<NonUniqueIndexTuple> ret;
         if (searchKey instanceof NonUniqueIndexTuple) {
             ret = datas.ceiling((NonUniqueIndexTuple) searchKey);
         } else {
@@ -57,7 +57,8 @@ public class NonUniqueIndex implements IIndex {
     @Override
     public ITuple insert(ITuple tuple) {
         NonUniqueIndexTuple insert = new NonUniqueIndexTuple(tuple);
-        NonUniqueIndexTuple higher = (NonUniqueIndexTuple) findTuple(insert), lower = higher.prev;
+        NonUniqueIndexTuple higher = (NonUniqueIndexTuple) findTuple(insert);
+        NonUniqueIndexTuple lower = higher.prev;
         insert.next = higher;
         higher.prev = insert;
         if (lower != null) {
@@ -76,12 +77,12 @@ public class NonUniqueIndex implements IIndex {
     }
 
     @Override
-    public IndexSearchResult firstSearch(Predicate selectedPredicate) {
-        ITuple nextTuple = null;
+    public IndexSearchResult firstTreeSearch(Predicate selectedPredicate) {
+        ITuple<NonUniqueIndexTuple> nextTuple = null;
         if (selectedPredicate.expression == Expression.LESS || selectedPredicate.expression == Expression.LESS_EQUAL) {
             nextTuple = firstTuple();
         } else if (selectedPredicate.expression == Expression.LARGER) {
-            ITuple searchTuple = buildSearchTuple((String) selectedPredicate.value, Integer.MAX_VALUE);
+            NonUniqueIndexTuple searchTuple = buildSearchTuple((String) selectedPredicate.value, Integer.MAX_VALUE);
             nextTuple = findTuple(searchTuple);
             if (nextTuple != endDummy && nextTuple.compareTo(searchTuple) == 0) {
                 nextTuple = nextTuple.next();
@@ -94,7 +95,7 @@ public class NonUniqueIndex implements IIndex {
                 nextTuple == endDummy || !selectedPredicate.check(nextTuple), nextTuple);
     }
 
-    public NonUniqueIndexTuple buildSearchTuple(String name, int id) {
+    private NonUniqueIndexTuple buildSearchTuple(String name, int id) {
         return new NonUniqueIndexTuple(name, id, -1);
     }
 

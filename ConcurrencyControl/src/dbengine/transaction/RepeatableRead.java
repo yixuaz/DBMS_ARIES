@@ -2,63 +2,25 @@ package dbengine.transaction;
 
 
 import dbengine.storage.ITuple;
-import dbengine.storage.clusterIndex.IPrimaryTuple;
-import dbengine.storage.multipleversion.IDeltaStorageRecordIterator;
-import dbengine.storage.multipleversion.IDeltaStorageRecordUpdater;
+import dbengine.transaction.model.LockMode;
+import dbengine.transaction.model.LockStrategy;
+import dbengine.transaction.model.TxnReadView;
 import dbms.SystemCatalog;
 
-import java.util.ArrayList;
-import java.util.List;
-
-public class RepeatableRead implements IIsolationLevel {
-    TxnReadView readView = null;
-    List<HoldLock> holdLocks = new ArrayList<>();
-
+public class RepeatableRead extends IsolationLevelCommon {
 
     @Override
-    public ITuple lockIfVisible(ITuple ret, LockMode lockMode, TxnReadView readView, LockStrategy strategy) {
+    public ITuple lockIfVisible(ITuple toBeLocked, LockMode lockMode, TxnReadView readView, LockStrategy strategy) {
         if (lockMode == null) {
-            if (ret.isPrimary()) {
-                IDeltaStorageRecordIterator pointer = (IDeltaStorageRecordIterator) ret;
-                while (pointer != null && !readView.isVisble(pointer.getTxnId())) {
-                    pointer = pointer.getPrevVersionRecord();
-                }
-                if (pointer == null) {
-                    return null;
-                }
-                if (pointer instanceof IDeltaStorageRecordUpdater) {
-                    return ((IPrimaryTuple) ret).buildOldVersion((IDeltaStorageRecordUpdater) pointer);
-                } else {
-                    return ret;
-                }
-            } else {
-                return readView.isVisble(ret.getTxnId()) ? ret : null;
-            }
-        } else if (lockMode == LockMode.INSERT_INTENTION) {
-            addLock(lockMode, ret);
-            return ret;
-        } else {
-            if (!strategy.couldOptimizeToRecordLockOnly) {
-                addLock(LockMode.GAP_LOCK, ret);
-            }
-            if (ret.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-                addLock(lockMode, ret);
-            }
-
-            return ret;
+            return findVisibleTuple(toBeLocked, readView);
         }
+        return acquireLockImprovementInRR(toBeLocked, lockMode, strategy);
     }
 
     @Override
-    public void unlockIfPossible(ITuple primary, ITuple secondary,
+    public void unlockIfPossible(ITuple primaryLockedTuple, ITuple secondaryLockedTuple,
                                  LockMode lockMode, boolean isTreeSearchLastNotMatchCondition) {
-        if (isTreeSearchLastNotMatchCondition) {
-            if (secondary != null) {
-                removeLock(lockMode, secondary);
-            } else if (primary.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-                removeLock(lockMode, primary);
-            }
-        }
+        releaseLockImprovementInRR(primaryLockedTuple, secondaryLockedTuple, lockMode, isTreeSearchLastNotMatchCondition);
     }
 
     @Override
@@ -70,8 +32,4 @@ public class RepeatableRead implements IIsolationLevel {
         return readView;
     }
 
-    @Override
-    public List<HoldLock> getHoldLocks() {
-        return holdLocks;
-    }
 }

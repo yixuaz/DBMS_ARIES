@@ -1,31 +1,33 @@
 package serverlayer.model;
 
+import dbengine.storage.IIndex;
+import dbengine.storage.IPrimaryIndex;
 import dbengine.storage.ITuple;
-import dbengine.storage.clusterIndex.PrimaryIndex;
-import dbengine.storage.nonclusterIndex.NonUniqueIndex;
 import dbengine.storage.tables.ITable;
 import dbengine.transaction.IIsolationLevel;
-import dbengine.transaction.LockMode;
-import dbengine.transaction.TxnReadView;
+import dbengine.transaction.model.LockMode;
+import dbengine.transaction.model.TxnReadView;
 
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 public class PhysicalPlan implements Iterator<ITuple> {
 
-    public static final int allTableScan = 0;
-    public static final int secondaryIndexScan = 1;
-    public static final int primaryIndexScan = 2;
+    public static final int ALL_TABLE_SCAN = 0;
+    public static final int SECONDARY_INDEX_SCAN = 1;
+    public static final int PRIMARY_INDEX_SCAN = 2;
     
     public final int currentPlan;
-    final List<Predicate> targetPredicates;
-    LogicalPlan logicalPlan;
 
-    boolean targetIsTreeSearchWithEqualExp = false;
-    boolean firstIsInvalid = false;
-    ITuple curTuple;
-    private ITuple endDummy;
+    private final LogicalPlan logicalPlan;
+    private final List<Predicate> targetPredicates;
+    private final ITuple endDummy;
+
+    private boolean targetIsTreeSearchWithEqualExp;
+    private boolean firstIsInvalid;
+    private ITuple curTuple;
+
 
     public PhysicalPlan(List<Predicate> selectedPredicate, LogicalPlan logicalPlan) {
 
@@ -33,22 +35,23 @@ public class PhysicalPlan implements Iterator<ITuple> {
         this.logicalPlan = logicalPlan;
         if (isSqlWithoutCRUD()) { // commit or begin
             currentPlan = -1;
+            endDummy = null;
             return;
         }
         if (selectedPredicate.isEmpty()) {
-            currentPlan = allTableScan;
+            currentPlan = ALL_TABLE_SCAN;
             curTuple = new DummyTuple(logicalPlan.table.getClusterIndex().firstTuple());
             endDummy = logicalPlan.table.getClusterIndex().endDummy();
         } else if (selectedPredicate.get(0).offset == 1) {
-            currentPlan = secondaryIndexScan;
-            NonUniqueIndex nameIndex = logicalPlan.table.getSecondaryIndex(selectedPredicate.get(0).offset);
+            currentPlan = SECONDARY_INDEX_SCAN;
+            IIndex nameIndex = logicalPlan.table.getSecondaryIndex(selectedPredicate.get(0).offset);
             endDummy = nameIndex.endDummy();
-            fulfill(nameIndex.firstSearch(selectedPredicate.get(0)));
+            fulfill(nameIndex.firstTreeSearch(selectedPredicate.get(0)));
         } else {
-            currentPlan = primaryIndexScan;
-            PrimaryIndex primaryIndex = logicalPlan.table.getClusterIndex();
+            currentPlan = PRIMARY_INDEX_SCAN;
+            IPrimaryIndex primaryIndex = logicalPlan.table.getClusterIndex();
             endDummy = primaryIndex.endDummy();
-            fulfill(primaryIndex.firstSearch(selectedPredicate.get(0)));
+            fulfill(primaryIndex.firstTreeSearch(selectedPredicate.get(0)));
         }
     }
 
@@ -70,6 +73,9 @@ public class PhysicalPlan implements Iterator<ITuple> {
 
     @Override
     public ITuple next() {
+        if (curTuple == null) {
+            throw new NoSuchElementException();
+        }
         curTuple = curTuple.next();
         ITuple ret = curTuple;
         if (firstIsInvalid || curTuple == endDummy || !statisfyAllTargetPredicates(curTuple)) {
@@ -95,11 +101,11 @@ public class PhysicalPlan implements Iterator<ITuple> {
     }
 
     public ITuple findInPrimaryIndex(ITuple secondaryTuple) {
-        PrimaryIndex primaryIndex = logicalPlan.table.getClusterIndex();
+        IPrimaryIndex primaryIndex = logicalPlan.table.getClusterIndex();
         return primaryIndex.findTuple(primaryIndex.buildSearchTuple((Integer) secondaryTuple.getOffsetValue(0)));
     }
 
-    public List<Predicate> getProjection() {
+    public List<Predicate> getPredicates() {
         return logicalPlan.predicates;
     }
 

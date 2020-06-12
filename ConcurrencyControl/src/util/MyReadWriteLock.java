@@ -7,6 +7,9 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 
+/**
+ * this read write lock support read lock upgrade to write lock and let application handle potential deadlock problem
+ **/
 public class MyReadWriteLock implements ReadWriteLock {
 
     private Map<Thread, Integer> readingThreads =
@@ -17,7 +20,7 @@ public class MyReadWriteLock implements ReadWriteLock {
     private Thread writingThread = null;
 
 
-    public synchronized void lockRead() throws InterruptedException {
+    private synchronized void lockRead() throws InterruptedException {
         Thread callingThread = Thread.currentThread();
         while (!canGrantReadAccess(callingThread)) {
             wait();
@@ -36,7 +39,7 @@ public class MyReadWriteLock implements ReadWriteLock {
     }
 
 
-    public synchronized void unlockRead() {
+    private synchronized void unlockRead() {
         Thread callingThread = Thread.currentThread();
         if (!isReader(callingThread)) {
             throw new IllegalMonitorStateException("Calling Thread does not" +
@@ -51,7 +54,7 @@ public class MyReadWriteLock implements ReadWriteLock {
         notifyAll();
     }
 
-    public synchronized void lockWrite() throws InterruptedException {
+    private synchronized void lockWrite() throws InterruptedException {
         writeRequests++;
         Thread callingThread = Thread.currentThread();
         while (!canGrantWriteAccess(callingThread)) {
@@ -62,7 +65,7 @@ public class MyReadWriteLock implements ReadWriteLock {
         writingThread = callingThread;
     }
 
-    public synchronized void unlockWrite() {
+    private synchronized void unlockWrite() {
         if (!isWriter(Thread.currentThread())) {
             throw new IllegalMonitorStateException("Calling Thread does not" +
                     " hold the write lock on this ReadWriteLock");

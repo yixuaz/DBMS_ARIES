@@ -1,15 +1,12 @@
 package dbengine.transaction;
 
 import dbengine.storage.ITuple;
-import dbengine.storage.LockType;
+import dbengine.transaction.model.LockMode;
+import dbengine.transaction.model.LockStrategy;
+import dbengine.transaction.model.TxnReadView;
 import dbms.SystemCatalog;
 
-import java.util.ArrayList;
-import java.util.List;
-
-public class ReadUncomitted implements IIsolationLevel {
-    List<HoldLock> holdLocks = new ArrayList<>();
-
+public class ReadUncomitted extends IsolationLevelCommon {
 
     @Override
     public ITuple lockIfVisible(ITuple ret, LockMode lockMode, TxnReadView readView, LockStrategy strategy) {
@@ -19,24 +16,14 @@ public class ReadUncomitted implements IIsolationLevel {
         return ret;
     }
 
-
     @Override
-    public void unlockIfPossible(ITuple ret, ITuple backup, LockMode lockMode, boolean isTreeSearchLastNotMatchCondition) {
-        if (ret.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-            removeLock(lockMode, ret);
+    public void unlockIfPossible(ITuple primaryLockedTuple, ITuple secondaryLockedTuple, LockMode lockMode, boolean isTreeSearchLastNotMatchCondition) {
+        if (primaryLockedTuple.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
+            removeLock(lockMode, primaryLockedTuple);
         }
-        if (backup != null && backup.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-            removeLock(lockMode, backup);
+        if (secondaryLockedTuple != null && secondaryLockedTuple.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
+            removeLock(lockMode, secondaryLockedTuple);
         }
     }
 
-    @Override
-    public TxnReadView getTxnReadView() {
-        return null;
-    }
-
-    @Override
-    public List<HoldLock> getHoldLocks() {
-        return holdLocks;
-    }
 }

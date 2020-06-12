@@ -1,11 +1,8 @@
-package dbengine.storage.clusterIndex;
+package dbengine.storage.clusterindex;
 
 import dbengine.storage.Expression;
-import dbengine.storage.IIndex;
 import dbengine.storage.IPrimaryIndex;
 import dbengine.storage.ITuple;
-import dbengine.storage.IUniqueIndex;
-import dbengine.transaction.LockMode;
 import dbms.SystemCatalog;
 import serverlayer.model.IndexSearchResult;
 import serverlayer.model.Predicate;
@@ -14,17 +11,25 @@ import java.util.TreeSet;
 
 import static dbms.SystemCatalog.END_DUMMY_TXN_ID_TAG;
 
+/**
+ * this class is used by storing db data
+ * the data is saved in a red-black tree(2-3 B-tree), with link to prev/next node
+ * the last there is a end dummy to represent supremum
+ */
 public class PrimaryIndex implements IPrimaryIndex {
     private static final PrimaryTuple endDummy = new PrimaryTuple(0, null, 0,
             null, null, END_DUMMY_TXN_ID_TAG);
-    final TreeSet<PrimaryTuple> primaryId2Tuple = new TreeSet<>();
-    {
-        primaryId2Tuple.add(new PrimaryTuple(1, "aaa", 100, null, null, 0));
-        primaryId2Tuple.add(new PrimaryTuple(2, "bbb", 200, null, null, 0));
-        primaryId2Tuple.add(new PrimaryTuple(3, "bbb", 300, null, null, 0));
-        primaryId2Tuple.add(new PrimaryTuple(7, "ccc", 200, null, null, 0));
+    private final TreeSet<PrimaryTuple> primaryId2Tuples = new TreeSet<>();
+
+    public PrimaryIndex() {
+        // import initial data
+        primaryId2Tuples.add(new PrimaryTuple(1, "aaa", 100, null, null, 0));
+        primaryId2Tuples.add(new PrimaryTuple(2, "bbb", 200, null, null, 0));
+        primaryId2Tuples.add(new PrimaryTuple(3, "bbb", 300, null, null, 0));
+        primaryId2Tuples.add(new PrimaryTuple(7, "ccc", 200, null, null, 0));
         PrimaryTuple pre = null;
-        for (PrimaryTuple cur : primaryId2Tuple) {
+        // setup linked list
+        for (PrimaryTuple cur : primaryId2Tuples) {
             if (pre != null) {
                 pre.next = cur;
                 cur.prev = pre;
@@ -34,23 +39,32 @@ public class PrimaryIndex implements IPrimaryIndex {
         }
         endDummy.prev = pre;
         endDummy.getGapLock().refresh();
-        pre.next = endDummy;
+        if (pre != null) {
+            pre.next = endDummy;
+        }
     }
 
+
     @Override
-    public synchronized ITuple findTuple(ITuple searchKey) {
-        ITuple search = primaryId2Tuple.ceiling((PrimaryTuple) searchKey);
+    public ITuple findTuple(ITuple searchKey) {
+        ITuple<PrimaryTuple> search = primaryId2Tuples.ceiling((PrimaryTuple) searchKey);
         return search == null ? endDummy : search;
     }
 
     @Override
     public synchronized ITuple firstTuple() {
-        return primaryId2Tuple.first();
+        return primaryId2Tuples.first();
     }
 
-
+    /**
+     * this method is used to build search tuple when do a index search
+     * it only needs pid to find the first tuple it need
+     *
+     * @param pid
+     * @return PrimaryTuple which only have pid (used to
+     */
     public PrimaryTuple buildSearchTuple(int pid) {
-        return new PrimaryTuple(pid, "",0,null, null, -1);
+        return new PrimaryTuple(pid);
     }
 
 
@@ -58,9 +72,9 @@ public class PrimaryIndex implements IPrimaryIndex {
     public ITuple insert(ITuple tuple) {
         int pid = (Integer) tuple.getOffsetValue(0);
         if (pid == SystemCatalog.NULL_PRIMARY_ID) {
-            tuple.setOffsetValue(0, primaryId2Tuple.isEmpty() ? 1 : primaryId2Tuple.last().id + 1, tuple.getTxnId());
+            pid = primaryId2Tuples.isEmpty() ? 1 : primaryId2Tuples.last().id + 1;
         }
-        PrimaryTuple add = new PrimaryTuple(pid,  (String) tuple.getOffsetValue(1), (Integer) tuple.getOffsetValue(2),
+        PrimaryTuple add = new PrimaryTuple(pid, (String) tuple.getOffsetValue(1), (Integer) tuple.getOffsetValue(2),
                 null, null, tuple.getTxnId());
         PrimaryTuple higher = (PrimaryTuple) findTuple(add);
         PrimaryTuple lower = higher.prev;
@@ -70,7 +84,7 @@ public class PrimaryIndex implements IPrimaryIndex {
             add.prev = lower;
             lower.next = add;
         }
-        if (primaryId2Tuple.add(add)) {
+        if (primaryId2Tuples.add(add)) {
             return add;
         }
         return null;
@@ -82,13 +96,14 @@ public class PrimaryIndex implements IPrimaryIndex {
     }
 
     @Override
-    public IndexSearchResult firstSearch(Predicate selectedPredicate) {
-        ITuple nextTuple;
-        boolean targetIsTreeSearchWithEqualExp = false, lastTupleIsInvalid = false;
+    public IndexSearchResult firstTreeSearch(Predicate selectedPredicate) {
+        ITuple<PrimaryTuple> nextTuple;
+        boolean targetIsTreeSearchWithEqualExp = false;
+        boolean lastTupleIsInvalid = false;
         if (selectedPredicate.expression == Expression.LESS || selectedPredicate.expression == Expression.LESS_EQUAL) {
             nextTuple = firstTuple();
-        } else  {
-            ITuple searchTuple = buildSearchTuple((Integer) selectedPredicate.value);
+        } else {
+            PrimaryTuple searchTuple = buildSearchTuple((Integer) selectedPredicate.value);
             nextTuple = findTuple(searchTuple);
             boolean isEqual = nextTuple.compareTo(searchTuple) == 0;
             if (isEqual) {
@@ -104,17 +119,16 @@ public class PrimaryIndex implements IPrimaryIndex {
             }
         }
         lastTupleIsInvalid |= (nextTuple == endDummy || !selectedPredicate.check(nextTuple));
-        return new IndexSearchResult(targetIsTreeSearchWithEqualExp,
-                lastTupleIsInvalid, nextTuple);
+        return new IndexSearchResult(targetIsTreeSearchWithEqualExp, lastTupleIsInvalid, nextTuple);
     }
 
     @Override
     public boolean containsKey(ITuple search) {
-        return primaryId2Tuple.contains(search);
+        return primaryId2Tuples.contains(search);
     }
 
     @Override
     public IPrimaryTuple buildInsertTuple(int pid, int txnId, Comparable... otherFields) {
-        return new PrimaryTuple(pid, (String) otherFields[0], (Integer) otherFields[1],null, null, txnId);
+        return new PrimaryTuple(pid, (String) otherFields[0], (Integer) otherFields[1], null, null, txnId);
     }
 }

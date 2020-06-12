@@ -1,16 +1,14 @@
 package lock;
 
-import dbengine.transaction.IsolationLevel;
+import dbengine.transaction.model.IsolationLevelType;
 import org.junit.Test;
-import serverlayer.model.InvalidSqlException;
 
-import java.io.IOException;
 import java.util.Arrays;
 
 public class ReadRepeatableLockTest extends BaseTest {
     @Override
-    public IsolationLevel getIsolationLevel() {
-        return IsolationLevel.RR;
+    public IsolationLevelType getIsolationLevel() {
+        return IsolationLevelType.RR;
     }
 
     // test primary search, the locks added

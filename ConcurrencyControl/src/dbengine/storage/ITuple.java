@@ -5,22 +5,31 @@ import dbengine.storage.multipleversion.IMultipleVersion;
 import java.util.Collections;
 import java.util.List;
 
-public interface ITuple<T extends ITuple> extends IDBLock, IMultipleVersion, Comparable<T> {
+/**
+ * a tuple is a leaf node in a index, it should be comparable and have multiple version and should have lock
+ *
+ * @param <T>
+ */
+public interface ITuple<T extends ITuple> extends IDbTupleLock, IMultipleVersion, Comparable<T> {
 
     boolean isPrimary();
 
-    boolean isUnique();
+    // check this offset is exists in the tuple
+    boolean offsetExists(int offset);
 
-    String toString();
+    // get the tuple's value from this offset
+    Comparable getOffsetValue(int offset);
 
-    boolean haveOffsetValue(int offset);
+    // set the tuple's value from this offset
+    void setOffsetValue(int offset, Comparable val, int txnId);
 
-    Comparable getOffsetValue(int offset) ;
+    // get this offset name (like 0 -> id, 1 -> name)
+    String getOffsetName(int columns);
 
-    void setOffsetValue(int offset, Comparable val, int txnId) ;
-
+    // link to the previous leaf node
     ITuple prev();
 
+    // link to the next leaf node
     ITuple next();
 
     default String toString(List<Integer> requiredColumns) {
@@ -41,7 +50,6 @@ public interface ITuple<T extends ITuple> extends IDBLock, IMultipleVersion, Com
         return stringBuilder.toString();
     }
 
-    String getOffsetName(int columns);
 
 
 }

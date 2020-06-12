@@ -1,21 +1,22 @@
 package dbengine.storage;
 
-import dbengine.storage.clusterIndex.PrimaryTuple;
-import dbengine.storage.nonclusterIndex.NonUniqueIndexTuple;
+import dbengine.storage.clusterindex.PrimaryTuple;
+import dbengine.storage.nonclusterindex.NonUniqueIndexTuple;
 import dbms.SystemCatalog;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class GapLock {
-    Comparable lowBound;
-    Comparable highBound;
-    final Comparable MINIMUM = (other) -> -1;
-    final Comparable MAXIMUM = (other) -> 1;
-    final ReadWriteLock rwLock = new ReentrantReadWriteLock();
-    final ITuple parent;
+    private static final Comparable MINIMUM = other -> -1;
+    private static final Comparable MAXIMUM = other -> 1;
+
+    private Comparable lowBound;
+
+    private final Comparable highBound;
+    private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final ITuple parent;
+
     public GapLock(ITuple lowBound, ITuple highBound) {
         this.lowBound = (lowBound == null) ?  MINIMUM : lowBound;
         this.highBound = (highBound.getTxnId() == SystemCatalog.END_DUMMY_TXN_ID_TAG) ?  MAXIMUM : highBound;

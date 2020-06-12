@@ -1,6 +1,6 @@
 package main;
 
-import dbengine.transaction.IsolationLevel;
+import dbengine.transaction.model.IsolationLevelType;
 import dbms.TransactionThread;
 
 import java.util.ArrayList;
@@ -25,7 +25,7 @@ public class Main {
             for (int i = 1; i <= clientNum; i++) {
                 System.out.println("please input " + i + "th client isolation level (eg. NO, RU, RC, RR, SERIAL):");
                 msgQueues.add(new LinkedBlockingQueue<>());
-                es.submit(new TransactionThread(IsolationLevel.valueOf(sc.nextLine().trim().toUpperCase())
+                es.submit(new TransactionThread(IsolationLevelType.valueOf(sc.nextLine().trim().toUpperCase())
                         , msgQueues.get(msgQueues.size() - 1)));
             }
             System.out.println("now you can send instruction to client by input 'clientId:sql'");

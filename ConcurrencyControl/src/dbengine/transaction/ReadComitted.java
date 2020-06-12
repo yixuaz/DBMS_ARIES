@@ -1,53 +1,34 @@
 package dbengine.transaction;
 
 
-import dbengine.storage.LockType;
-import dbengine.storage.multipleversion.IDeltaStorageRecordIterator;
-import dbengine.storage.multipleversion.IDeltaStorageRecordUpdater;
 import dbengine.storage.ITuple;
-import dbengine.storage.clusterIndex.IPrimaryTuple;
-import dbms.DBEngineGlobalEnvironment;
+import dbengine.transaction.model.LockMode;
+import dbengine.transaction.model.LockStrategy;
+import dbengine.transaction.model.TxnReadView;
 import dbms.SystemCatalog;
 
-import java.util.ArrayList;
-import java.util.List;
+public class ReadComitted extends IsolationLevelCommon {
 
-public class ReadComitted implements IIsolationLevel {
-    List<HoldLock> holdLocks = new ArrayList<>();
     @Override
-    public ITuple lockIfVisible(ITuple ret, LockMode lockMode, TxnReadView readView,  LockStrategy strategy) {
+    public ITuple lockIfVisible(ITuple lockedTuple, LockMode lockMode, TxnReadView readView, LockStrategy strategy) {
         if (lockMode == null) {
-            if (ret.isPrimary()) {
-                IDeltaStorageRecordIterator pointer = (IDeltaStorageRecordIterator) ret;
-                while (pointer != null && !readView.isVisble(pointer.getTxnId())) {
-                    pointer = pointer.getPrevVersionRecord();
-                }
-                if (pointer == null) {
-                    return null;
-                }
-                if (pointer instanceof IDeltaStorageRecordUpdater) {
-                    return ((IPrimaryTuple) ret).buildOldVersion((IDeltaStorageRecordUpdater) pointer);
-                } else {
-                    return ret;
-                }
-            } else {
-                return readView.isVisble(ret.getTxnId()) ? ret : null;
-            }
+            return findVisibleTuple(lockedTuple, readView);
         } else {
-            if (lockMode != LockMode.INSERT_INTENTION && ret.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-                addLock(lockMode, ret);
+            if (lockMode != LockMode.INSERT_INTENTION
+                    && lockedTuple.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
+                addLock(lockMode, lockedTuple);
             }
-            return ret;
+            return lockedTuple;
         }
     }
 
     @Override
-    public void unlockIfPossible(ITuple ret, ITuple backup, LockMode lockMode, boolean isTreeSearchLastNotMatchCondition) {
-        if (ret.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-            removeLock(lockMode, ret);
+    public void unlockIfPossible(ITuple primaryLockedTuple, ITuple secondaryLockedTuple, LockMode lockMode, boolean isTreeSearchLastNotMatchCondition) {
+        if (primaryLockedTuple.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
+            removeLock(lockMode, primaryLockedTuple);
         }
-        if (backup != null && backup.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
-            removeLock(lockMode, backup);
+        if (secondaryLockedTuple != null && secondaryLockedTuple.getTxnId() != SystemCatalog.END_DUMMY_TXN_ID_TAG) {
+            removeLock(lockMode, secondaryLockedTuple);
         }
     }
 
@@ -56,22 +37,4 @@ public class ReadComitted implements IIsolationLevel {
         int txnId = SystemCatalog.getTxnId(Thread.currentThread().getId());
         return new TxnReadView(txnId);
     }
-
-    @Override
-    public List<HoldLock> getHoldLocks() {
-        return holdLocks;
-    }
-
-
-//    @Override
-//    public void insert(IIndex table, ITuple tuple) {
-//        GapLock lock = table.findGapLock(tuple);
-//        lock.lockInWriteMode();
-//        ITuple ret = table.insert(tuple);
-//        lock.unlockInWriteMode();
-//        addLock(LockMode.EXCLUSIVE, ret);
-//    }
-
-
-
 }

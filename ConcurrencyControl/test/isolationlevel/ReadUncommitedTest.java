@@ -1,8 +1,7 @@
 package isolationlevel;
 
-import dbengine.transaction.IsolationLevel;
+import dbengine.transaction.model.IsolationLevelType;
 import isolationlevel.model.SqlMsg;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -11,8 +10,8 @@ import java.util.List;
 public class ReadUncommitedTest extends BaseTest {
 
     @Override
-    public IsolationLevel getIsolationLevel() {
-        return IsolationLevel.RU;
+    public IsolationLevelType getIsolationLevel() {
+        return IsolationLevelType.RU;
     }
 
     @Test

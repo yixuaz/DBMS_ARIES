@@ -1,11 +1,10 @@
 package isolationlevel;
 
-import dbengine.transaction.IsolationLevel;
+import dbengine.transaction.model.IsolationLevelType;
 import dbms.DBClient;
 import isolationlevel.model.SqlMsg;
 import isolationlevel.model.WriteSkewTestThread;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -15,8 +14,8 @@ import java.util.concurrent.FutureTask;
 public class ReadCommitedTest extends BaseTest {
 
     @Override
-    public IsolationLevel getIsolationLevel() {
-        return IsolationLevel.RC;
+    public IsolationLevelType getIsolationLevel() {
+        return IsolationLevelType.RC;
     }
 
     @Test

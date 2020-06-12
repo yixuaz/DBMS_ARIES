@@ -1,7 +1,7 @@
 package serverlayer.model;
 
 import dbengine.storage.Expression;
-import dbengine.storage.clusterIndex.IPrimaryTuple;
+import dbengine.storage.clusterindex.IPrimaryTuple;
 
 public class UpdatedFunction extends Predicate {
     public UpdatedFunction(int offset, Comparable value) {

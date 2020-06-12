@@ -1,11 +1,10 @@
 package isolationlevel;
 
-import dbengine.transaction.IsolationLevel;
+import dbengine.transaction.model.IsolationLevelType;
 import dbms.DBClient;
 import isolationlevel.model.SqlMsg;
 import isolationlevel.model.WriteSkewTestThread;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -115,7 +114,7 @@ public class SerializableTest extends BaseTest{
     }
 
     @Override
-    public IsolationLevel getIsolationLevel() {
-        return IsolationLevel.SERIAL;
+    public IsolationLevelType getIsolationLevel() {
+        return IsolationLevelType.SERIAL;
     }
 }

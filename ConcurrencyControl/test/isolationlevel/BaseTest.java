@@ -1,7 +1,7 @@
 package isolationlevel;
 
 import dbengine.transaction.IIsolationLevel;
-import dbengine.transaction.IsolationLevel;
+import dbengine.transaction.model.IsolationLevelType;
 import dbms.DBClient;
 import dbms.SystemCatalog;
 import dbms.TransactionThread;
@@ -10,7 +10,6 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import serverlayer.model.InvalidSqlException;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -30,7 +29,7 @@ public abstract class BaseTest {
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
     private final PrintStream originalOut = System.out;
 
-    abstract public IsolationLevel getIsolationLevel();
+    abstract public IsolationLevelType getIsolationLevel();
 
     @Before
     public void setUpStreams() {
@@ -55,7 +54,7 @@ public abstract class BaseTest {
         boolean isFirstMsg = true;
         for (SqlMsg sql : msgs) {
             txns.get(sql.getTxnId()).add(sql.getSql());
-            Thread.sleep(isFirstMsg ? 130 : 5);
+            Thread.sleep(isFirstMsg ? 150 : 8);
             isFirstMsg = false;
         }
         for (FutureTask ft : futureTasks) ft.get();

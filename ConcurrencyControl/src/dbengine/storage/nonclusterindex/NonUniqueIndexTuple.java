@@ -1,4 +1,4 @@
-package dbengine.storage.nonclusterIndex;
+package dbengine.storage.nonclusterindex;
 
 import dbengine.storage.GapLock;
 import dbengine.storage.ITuple;
@@ -7,14 +7,15 @@ import util.MyReadWriteLock;
 import java.util.concurrent.locks.ReadWriteLock;
 
 public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
-    String name;
     int primaryId;
     NonUniqueIndexTuple next;
     NonUniqueIndexTuple prev;
-    int txnId;
 
-    final ReadWriteLock rwLock = new MyReadWriteLock();
-    final GapLock gapLock;
+    private String name;
+    private int txnId;
+    private final ReadWriteLock rwLock = new MyReadWriteLock();
+    private final GapLock gapLock;
+
     public NonUniqueIndexTuple(ITuple raw) {
         this((String) raw.getOffsetValue(1), (Integer) raw.getOffsetValue(0), raw.getTxnId());
     }
@@ -31,13 +32,9 @@ public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
         return false;
     }
 
-    @Override
-    public boolean isUnique() {
-        return false;
-    }
 
     @Override
-    public boolean haveOffsetValue(int offset) {
+    public boolean offsetExists(int offset) {
         return offset >= 0 && offset <= 1;
     }
 
@@ -51,10 +48,11 @@ public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
     @Override
     public void setOffsetValue(int offset, Comparable val, int txnId) {
         // no need in this project
+        throw new UnsupportedOperationException();
     }
 
     @Override
-    public ReadWriteLock getRWLock() {
+    public ReadWriteLock getRecordLock() {
         return rwLock;
     }
 
@@ -99,7 +97,7 @@ public class NonUniqueIndexTuple implements ITuple<NonUniqueIndexTuple> {
 
     @Override
     public String toString() {
-        return  "[SEC_IDX]name='" + name + '\'' +
+        return "[SEC_IDX]name='" + name + '\'' +
                 ", primaryId=" + primaryId;
     }
 }

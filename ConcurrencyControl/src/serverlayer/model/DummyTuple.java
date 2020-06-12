@@ -29,12 +29,7 @@ public class DummyTuple implements ITuple {
     }
 
     @Override
-    public boolean isUnique() {
-        return false;
-    }
-
-    @Override
-    public boolean haveOffsetValue(int offset) {
+    public boolean offsetExists(int offset) {
         return false;
     }
 
@@ -45,7 +40,7 @@ public class DummyTuple implements ITuple {
 
     @Override
     public void setOffsetValue(int offset, Comparable val, int txnId) {
-
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -55,7 +50,7 @@ public class DummyTuple implements ITuple {
 
 
     @Override
-    public ReadWriteLock getRWLock() {
+    public ReadWriteLock getRecordLock() {
         return null;
     }
 

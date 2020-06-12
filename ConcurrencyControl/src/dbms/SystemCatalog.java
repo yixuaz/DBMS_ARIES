@@ -1,7 +1,5 @@
 package dbms;
 
-import dbengine.storage.ITuple;
-import dbengine.storage.clusterIndex.PrimaryTuple;
 import dbengine.storage.tables.ITable;
 import dbengine.storage.tables.MyTable;
 
@@ -12,7 +10,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class SystemCatalog {
     public static final int END_DUMMY_TXN_ID_TAG = Integer.MIN_VALUE;
-    public static final ITuple INVALID_TUPLE = new PrimaryTuple(-1,null,-1,null,null,-1);
     public static final int NULL_PRIMARY_ID = Integer.MIN_VALUE;
     private static Map<String, ITable> name2table = new HashMap<>();
     private static Map<ITable, TableSystemCatalog> name2tableConfig = new HashMap<>();
@@ -30,8 +27,6 @@ public class SystemCatalog {
         return name2tableConfig.get(table);
     }
 
-
-
     public static void reset() {
         ITable t = new MyTable();
         name2table.put("t", t);
@@ -41,12 +36,8 @@ public class SystemCatalog {
     }
 
     public static int getTxnId(long clientId) {
-        Integer txnId = clientId2TxnId.get(clientId);
-        if (txnId == null) {
-            txnId = txnIdGenerator.incrementAndGet();
-            DBEngineGlobalEnvironment.addTxnId(txnId);
-            clientId2TxnId.put(clientId, txnId);
-        }
+        int txnId = clientId2TxnId.computeIfAbsent(clientId, k -> txnIdGenerator.incrementAndGet());
+        DBEngineGlobalEnvironment.addTxnId(txnId);
         return txnId;
     }
 

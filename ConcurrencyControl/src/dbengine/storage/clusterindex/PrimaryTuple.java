@@ -1,4 +1,4 @@
-package dbengine.storage.clusterIndex;
+package dbengine.storage.clusterindex;
 
 import dbengine.storage.GapLock;
 import dbengine.storage.ITuple;
@@ -6,18 +6,21 @@ import dbengine.storage.multipleversion.IDeltaStorageRecordIterator;
 import dbengine.storage.multipleversion.IDeltaStorageRecordUpdater;
 import util.MyReadWriteLock;
 
-import java.util.List;
 import java.util.concurrent.locks.ReadWriteLock;
 
 public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
+    PrimaryTuple next;
+    PrimaryTuple prev;
     int id;
-    String name;
-    int num;
-    IDeltaStorageRecordIterator prevVersionRecord;
-    int txnId;
-    PrimaryTuple next, prev;
-    final ReadWriteLock rwLock = new MyReadWriteLock();
-    final GapLock gapLock;
+    private String name;
+    private int num;
+    private IDeltaStorageRecordIterator prevVersionRecord;
+    private int txnId;
+    private final ReadWriteLock rwLock = new MyReadWriteLock();
+    private final GapLock gapLock;
+
+
+
     public PrimaryTuple(int id, String name, int num, PrimaryTuple next, PrimaryTuple prev, int txnId) {
         this.id = id;
         this.name = name;
@@ -29,6 +32,14 @@ public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
     }
     private PrimaryTuple(int id, String name, int num, PrimaryTuple next, PrimaryTuple prev) {
         this(id, name, num, next, prev, -1);
+    }
+
+    public PrimaryTuple(int id) {
+        this(id, null, 0, null, null, -1);
+    }
+
+    public PrimaryTuple(int id, String name, int num, int txnId) {
+        this(id, name, num, null, null, txnId);
     }
 
     @Override
@@ -49,7 +60,7 @@ public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
     }
 
     @Override
-    public boolean haveOffsetValue(int offset) {
+    public boolean offsetExists(int offset) {
         return offset >= 0 && offset <= 2;
     }
 
@@ -61,12 +72,14 @@ public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
 
     public void setOffsetValue(int i, Comparable val, int txnId) {
         this.txnId = txnId;
-        if (i != 2) throw new IllegalStateException("myDB verison 0.1 not support update index column");
+        if (i != 2) {
+            throw new IllegalStateException("myDB verison 0.1 not support update index column");
+        }
         num = (Integer) val;
     }
 
     @Override
-    public ReadWriteLock getRWLock() {
+    public ReadWriteLock getRecordLock() {
         return rwLock;
     }
 
@@ -106,11 +119,6 @@ public class PrimaryTuple implements IPrimaryTuple<PrimaryTuple> {
 
     @Override
     public boolean isPrimary() {
-        return true;
-    }
-
-    @Override
-    public boolean isUnique() {
         return true;
     }
 

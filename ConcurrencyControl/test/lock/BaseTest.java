@@ -1,8 +1,8 @@
 package lock;
 
-import dbengine.transaction.HoldLock;
 import dbengine.transaction.IIsolationLevel;
-import dbengine.transaction.IsolationLevel;
+import dbengine.transaction.model.HoldLock;
+import dbengine.transaction.model.IsolationLevelType;
 import dbms.DBClient;
 import dbms.SystemCatalog;
 import org.junit.After;
@@ -19,7 +19,7 @@ import java.io.PrintStream;
 import java.util.List;
 
 public abstract class BaseTest {
-    abstract public IsolationLevel getIsolationLevel();
+    abstract public IsolationLevelType getIsolationLevel();
 
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
     private final PrintStream originalOut = System.out;

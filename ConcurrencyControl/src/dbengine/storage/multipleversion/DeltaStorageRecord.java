@@ -1,11 +1,15 @@
 package dbengine.storage.multipleversion;
 
-import dbengine.storage.clusterIndex.IPrimaryTuple;
+import dbengine.storage.clusterindex.IPrimaryTuple;
 import serverlayer.model.UpdatedFunction;
 
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * this class only record the delta change of the primary record with version(txn id)
+ * use UpdatedFunction to record the delta change
+ */
 public class DeltaStorageRecord implements IDeltaStorageRecordUpdater, IDeltaStorageRecordIterator {
     DeltaStorageRecord next;
     List<UpdatedFunction> deltaChange;

@@ -1,4 +1,11 @@
-# DBMS_ARIES
+# 5 DBMS Transaction Projects Aim
+- [x] 1. first project is to implement Recorvery Manager **ARIES** to ensure Durabilty and Atomicty. 
+- [x] 2. second project is to implement Concurrency Control **MV-2PL** to ensure Isolation
+- [ ] 3. third project is to implement Pessimistic distributed transactions based on first project (**2PC**)
+- [ ] 4. fourth project is to implement LSM TREE KV STORE
+- [ ] 5. fifth project is to implement Optimistic distributed transactions based on first project (**OCC**)
+
+## DBMS_ARIES
 a tiny database with ARIES recovery algorithm With WAL and Fuzzy Checkpoint to achieve ACID
 
 ## Introduction

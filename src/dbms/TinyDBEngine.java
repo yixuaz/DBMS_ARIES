@@ -55,6 +55,10 @@ public class TinyDBEngine {
         return curLsn;
     }
 
+    public void flushLog() {
+        // this function is used for lab3
+        bufferPool.flushLog();
+    }
     public void txnEnd(int txid, Integer prevLsn) {
         logManager.appendTxnEndLog(txid, prevLsn);
     }

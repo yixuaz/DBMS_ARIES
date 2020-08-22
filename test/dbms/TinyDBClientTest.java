@@ -21,6 +21,23 @@ public class TinyDBClientTest {
      * we need to restart db, then to check the txn atomicity should not be broken.
      */
     @Test
+    public void testTxnAllAbort() {
+        TinyDBClient dbClient = new TinyDBClient();
+        dbClient.doit("t1-abt");
+        dbClient.doit("t2-u-p1");
+        System.out.println( dbClient.doit("slct"));
+        dbClient.doit("t3-abt");
+        dbClient.doit("flush-log");
+        dbClient.crash();
+        dbClient.doit("t2-abt");
+        dbClient.doit("t2-cmt");
+
+        dbClient.start();
+
+        String selectResult = dbClient.doit("slct");
+        System.out.println(selectResult);
+    }
+    @Test
     public void testTxnAllCommit() {
         for (int testId = 0; testId < TEST_TIMES; testId++) {
             TinyDBClient dbClient = new TinyDBClient();
